@@ -1,0 +1,8 @@
+vendor
+ingress-istio-controller
+.DS_Store
+*.md
+LICENSE
+.git*
+Dockerfile
+deploy/
