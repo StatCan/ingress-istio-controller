@@ -2,8 +2,9 @@ package controller
 
 import (
 	"fmt"
+	"reflect"
+	"strings"
 
-	"gopkg.in/yaml.v2"
 	"istio.io/api/networking/v1beta1"
 	istionetworkingv1beta1 "istio.io/client-go/pkg/apis/networking/v1beta1"
 	v1 "k8s.io/api/core/v1"
@@ -31,82 +32,130 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 		}
 	}
 
-	// If we don't have virtual service, then let's make one
-	if vs == nil {
-		vs = &istionetworkingv1beta1.VirtualService{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: ingress.GenerateName,
-				Namespace:    ingress.Namespace,
-				OwnerReferences: []metav1.OwnerReference{
-					*metav1.NewControllerRef(ingress, schema.GroupVersionKind{
-						Version: "networking.k8s.io",
-						Kind:    "Ingress",
-					}),
-				},
-				Labels: ingress.Labels,
-			},
-			Spec: v1beta1.VirtualService{
-				Gateways: []string{c.defaultGateway},
-				Hosts:    []string{},
-				Http:     []*v1beta1.HTTPRoute{},
-			},
+	// If we don't have an ingress class, then let's ignore it.
+	if val, ok := ingress.Annotations["kubernetes.io/ingress.class"]; !ok || (c.ingressClass == "" || val != c.ingressClass) {
+		// A VirtualService already exists, so let's delete it.
+		if vs != nil {
+			klog.Infof("removing owned virtualservice: %s/%s", vs.Namespace, vs.Name)
+			err := c.istioclientset.NetworkingV1beta1().VirtualServices(vs.Namespace).Delete(vs.Name, &metav1.DeleteOptions{})
+			return err
 		}
 
-		for _, rule := range ingress.Spec.Rules {
-			if rule.HTTP == nil {
-				return fmt.Errorf("invalid ingress rule: %s/%s - no http definition", ingress.Namespace, ingress.Name)
-			}
-
-			// Add the host
-			host := rule.Host
-			if host == "" {
-				host = "*"
-			}
-			if !stringInArray(host, vs.Spec.Hosts) {
-				vs.Spec.Hosts = append(vs.Spec.Hosts, host)
-			}
-
-			// Add the path
-			for _, path := range rule.HTTP.Paths {
-				servicePort, err := c.getServicePort(ingress.Namespace, path.Backend)
-				if err != nil {
-					return err
-				}
-
-				route := &v1beta1.HTTPRoute{
-					Route: []*v1beta1.HTTPRouteDestination{
-						{
-							Destination: &v1beta1.Destination{
-								Host: fmt.Sprintf("%s.%s.svc.%s", path.Backend.ServiceName, ingress.Namespace, c.clusterDomain),
-								Port: &v1beta1.PortSelector{
-									Number: servicePort,
-								},
-							},
-							Weight: int32(c.defaultWeight),
-						},
-					},
-				}
-
-				if path.Path != "" {
-					route.Match = []*v1beta1.HTTPMatchRequest{
-						{
-							Uri: createStringMatch(path.Path),
-						},
-					}
-				}
-
-				vs.Spec.Http = append(vs.Spec.Http, route)
-			}
-		}
+		klog.Infof("skipping ingress due to not matching ingress class: %s/%s", ingress.Namespace, ingress.Name)
+		return nil
 	}
 
-	b, err := yaml.Marshal(vs)
+	nvs, err := c.generateVirtualService(ingress)
 	if err != nil {
 		return err
 	}
 
-	klog.Infof("vs: %s", string(b))
-	return fmt.Errorf("handleVirtualService: not implemented")
+	// If we don't have virtual service, then let's make one
+	if vs == nil {
+		vs, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Create(nvs)
+		if err != nil {
+			return err
+		}
+	} else if !reflect.DeepEqual(vs.Spec, nvs.Spec) {
+		klog.Infof("updated virtual service %s/%s", vs.Namespace, vs.Name)
+
+		// Copy the new spec
+		vs.Spec = nvs.Spec
+
+		vs, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Update(vs)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress) (*istionetworkingv1beta1.VirtualService, error) {
+	vs := &istionetworkingv1beta1.VirtualService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ingress.Name,
+			Namespace: ingress.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(ingress, schema.GroupVersionKind{
+					Version: "networking.k8s.io",
+					Kind:    "Ingress",
+				}),
+			},
+			Labels: ingress.Labels,
+		},
+		Spec: v1beta1.VirtualService{
+			Gateways: []string{c.defaultGateway},
+			Hosts:    []string{},
+			Http:     []*v1beta1.HTTPRoute{},
+		},
+	}
+
+	for _, rule := range ingress.Spec.Rules {
+		if rule.HTTP == nil {
+			return nil, fmt.Errorf("invalid ingress rule: %s/%s - no http definition", ingress.Namespace, ingress.Name)
+		}
+
+		// Add the host
+		host := rule.Host
+		if host == "" {
+			host = "*"
+		}
+		if !stringInArray(host, vs.Spec.Hosts) {
+			vs.Spec.Hosts = append(vs.Spec.Hosts, host)
+		}
+
+		// Add the path
+		for _, path := range rule.HTTP.Paths {
+			servicePort, err := c.getServicePort(ingress.Namespace, path.Backend)
+			if err != nil {
+				return nil, err
+			}
+
+			var authorityMatchType v1beta1.StringMatch
+
+			if strings.Contains(host, "*") {
+				authorityMatchType = v1beta1.StringMatch{
+					MatchType: &v1beta1.StringMatch_Regex{
+						Regex: strings.ReplaceAll(host, "*", ".*"),
+					},
+				}
+			} else {
+				authorityMatchType = v1beta1.StringMatch{
+					MatchType: &v1beta1.StringMatch_Exact{
+						Exact: host,
+					},
+				}
+			}
+
+			route := &v1beta1.HTTPRoute{
+				Match: []*v1beta1.HTTPMatchRequest{
+					{
+						Authority: &authorityMatchType,
+					},
+				},
+				Route: []*v1beta1.HTTPRouteDestination{
+					{
+						Destination: &v1beta1.Destination{
+							Host: fmt.Sprintf("%s.%s.svc.%s", path.Backend.ServiceName, ingress.Namespace, c.clusterDomain),
+							Port: &v1beta1.PortSelector{
+								Number: servicePort,
+							},
+						},
+						Weight: int32(c.defaultWeight),
+					},
+				},
+			}
+
+			if path.Path != "" {
+				route.Match[0].Uri = createStringMatch(path.Path)
+			}
+
+			vs.Spec.Http = append(vs.Spec.Http, route)
+		}
+	}
+
+	return vs, nil
 }
 
 func (c *Controller) getServicePort(namespace string, backend networkingv1beta1.IngressBackend) (uint32, error) {
