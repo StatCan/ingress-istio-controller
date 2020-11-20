@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"istio.io/api/networking/v1beta1"
@@ -14,6 +15,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog"
+)
+
+var (
+	ingressClassAnnotation = "kubernetes.io/ingress.class"
+	ignoreAnnotation       = "ingress.statcan.gc.ca/ignore"
+	gatewaysAnnotation     = "ingress.statcan.gc.ca/gateways"
 )
 
 func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) error {
@@ -32,20 +39,45 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 		}
 	}
 
-	// If we don't have an ingress class, then let's ignore it.
-	if val, ok := ingress.Annotations["kubernetes.io/ingress.class"]; !ok || (c.ingressClass == "" || val != c.ingressClass) {
-		// A VirtualService already exists, so let's delete it.
+	// Check for conditions which cause us to ignore the Ingress
+	ignore := false
+
+	// If we don't have an ingress class, then let's ignore it
+	if val, ok := ingress.Annotations[ingressClassAnnotation]; !ok || (c.ingressClass == "" || val != c.ingressClass) {
+		klog.Infof("ingress class not set or does not match %s: %s/%s", c.ingressClass, ingress.Namespace, ingress.Name)
+		ignore = true
+	}
+
+	// Explicit ignore annotation
+	if val, ok := ingress.Annotations["ingress.statcan.gc.ca/ignore"]; ok {
+		bval, err := strconv.ParseBool(val)
+		if err != nil {
+			return fmt.Errorf("error parsing %s (%t): %v", ignoreAnnotation, bval, err)
+		}
+		ignore = ignore || bval
+	}
+
+	if ignore {
+		// A VirtualService already exists, so let's delete it
 		if vs != nil {
 			klog.Infof("removing owned virtualservice: %s/%s", vs.Namespace, vs.Name)
 			err := c.istioclientset.NetworkingV1beta1().VirtualServices(vs.Namespace).Delete(vs.Name, &metav1.DeleteOptions{})
 			return err
 		}
 
-		klog.Infof("skipping ingress due to not matching ingress class: %s/%s", ingress.Namespace, ingress.Name)
+		klog.Infof("skipping ingress: %s/%s", ingress.Namespace, ingress.Name)
 		return nil
 	}
 
-	nvs, err := c.generateVirtualService(ingress)
+	// Identify the gateway to attach the ingress to
+	gateways := []string{c.defaultGateway}
+
+	if val, ok := ingress.Annotations[gatewaysAnnotation]; ok {
+		gateways = strings.Split(val, ",")
+		klog.Infof("using override gateways for %s/%s: %s", ingress.Namespace, ingress.Name, gateways)
+	}
+
+	nvs, err := c.generateVirtualService(ingress, gateways)
 	if err != nil {
 		return err
 	}
@@ -71,7 +103,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 	return nil
 }
 
-func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress) (*istionetworkingv1beta1.VirtualService, error) {
+func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress, gateways []string) (*istionetworkingv1beta1.VirtualService, error) {
 	vs := &istionetworkingv1beta1.VirtualService{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ingress.Name,
@@ -85,7 +117,7 @@ func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress) 
 			Labels: ingress.Labels,
 		},
 		Spec: v1beta1.VirtualService{
-			Gateways: []string{c.defaultGateway},
+			Gateways: gateways,
 			Hosts:    []string{},
 			Http:     []*v1beta1.HTTPRoute{},
 		},
