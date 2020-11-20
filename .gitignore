@@ -2,4 +2,4 @@ vendor
 ingress-istio-controller
 .DS_Store
 .vscode
-__debug_big
+__debug_bin
