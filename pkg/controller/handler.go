@@ -43,7 +43,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 	ignore := false
 
 	// If we don't have an ingress class, then let's ignore it
-	if val, ok := ingress.Annotations[ingressClassAnnotation]; !ok || (c.ingressClass == "" || val != c.ingressClass) {
+	if val, ok := ingress.Annotations[ingressClassAnnotation]; !ok || (c.ingressClass != "" && val != c.ingressClass) {
 		klog.Infof("ingress class not set or does not match %s: %s/%s", c.ingressClass, ingress.Namespace, ingress.Name)
 		ignore = true
 	}
