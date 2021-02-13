@@ -1,4 +1,4 @@
-[(Français)](#controleur-distio-pour-ingress)
+[(Français)](#contr%C3%B4leur-distio-pour-ingress)
 
 ## Ingress Istio Controller
 
