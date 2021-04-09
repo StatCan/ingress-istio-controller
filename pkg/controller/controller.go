@@ -101,8 +101,8 @@ func NewController(
 			nvs := new.(*istionetworkingv1beta1.VirtualService)
 			ovs := old.(*istionetworkingv1beta1.VirtualService)
 			if nvs.ResourceVersion == ovs.ResourceVersion {
-				// Periodic resync will send update events for all known Deployments.
-				// Two different versions of the same Deployment will always have different RVs.
+				// Periodic resync will send update events for all known VirtualService.
+				// Two different versions of the same VirtualService will always have different RVs.
 				return
 			}
 			controller.handleObject(new)
