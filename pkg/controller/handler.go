@@ -17,9 +17,9 @@ import (
 )
 
 var (
-	ingressClassAnnotation = "kubernetes.io/ingress.class"
-	ignoreAnnotation       = "ingress.statcan.gc.ca/ignore"
-	gatewaysAnnotation     = "ingress.statcan.gc.ca/gateways"
+	IngressClassAnnotation = "kubernetes.io/ingress.class"
+	IgnoreAnnotation       = "ingress.statcan.gc.ca/ignore"
+	GatewaysAnnotation     = "ingress.statcan.gc.ca/gateways"
 )
 
 func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) error {
@@ -42,16 +42,16 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 	ignore := false
 
 	// If we don't have an ingress class, then let's ignore it
-	if val, ok := ingress.Annotations[ingressClassAnnotation]; !ok || (c.ingressClass != "" && val != c.ingressClass) {
+	if val, ok := ingress.Annotations[IngressClassAnnotation]; !ok || (c.ingressClass != "" && val != c.ingressClass) {
 		klog.Infof("ingress class not set or does not match %s: %s/%s", c.ingressClass, ingress.Namespace, ingress.Name)
 		ignore = true
 	}
 
 	// Explicit ignore annotation
-	if val, ok := ingress.Annotations["ingress.statcan.gc.ca/ignore"]; ok {
+	if val, ok := ingress.Annotations[IgnoreAnnotation]; ok {
 		bval, err := strconv.ParseBool(val)
 		if err != nil {
-			return fmt.Errorf("error parsing %s (%t): %v", ignoreAnnotation, bval, err)
+			return fmt.Errorf("error parsing %s (%t): %v", IgnoreAnnotation, bval, err)
 		}
 		ignore = ignore || bval
 	}
@@ -71,7 +71,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 	// Identify the gateway to attach the ingress to
 	gateways := []string{c.defaultGateway}
 
-	if val, ok := ingress.Annotations[gatewaysAnnotation]; ok {
+	if val, ok := ingress.Annotations[GatewaysAnnotation]; ok {
 		gateways = strings.Split(val, ",")
 		klog.Infof("using override gateways for %s/%s: %s", ingress.Namespace, ingress.Name, gateways)
 	}
