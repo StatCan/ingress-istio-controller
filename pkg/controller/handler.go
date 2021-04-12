@@ -12,7 +12,6 @@ import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog"
 )
@@ -84,7 +83,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 
 	// If we don't have virtual service, then let's make one
 	if vs == nil {
-		vs, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Create(nvs)
+		_, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Create(nvs)
 		if err != nil {
 			return err
 		}
@@ -94,7 +93,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 		// Copy the new spec
 		vs.Spec = nvs.Spec
 
-		vs, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Update(vs)
+		_, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Update(vs)
 		if err != nil {
 			return err
 		}
@@ -109,10 +108,7 @@ func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress, 
 			Name:      ingress.Name,
 			Namespace: ingress.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(ingress, schema.GroupVersionKind{
-					Version: "networking.k8s.io",
-					Kind:    "Ingress",
-				}),
+				*metav1.NewControllerRef(ingress, ingress.GroupVersionKind()),
 			},
 			Labels: ingress.Labels,
 		},
