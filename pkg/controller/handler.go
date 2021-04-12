@@ -12,7 +12,6 @@ import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog"
 )
@@ -109,10 +108,7 @@ func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress, 
 			Name:      ingress.Name,
 			Namespace: ingress.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(ingress, schema.GroupVersionKind{
-					Version: "networking.k8s.io",
-					Kind:    "Ingress",
-				}),
+				*metav1.NewControllerRef(ingress, networkingv1beta1.SchemeGroupVersion.WithKind("Ingress")),
 			},
 			Labels: ingress.Labels,
 		},
