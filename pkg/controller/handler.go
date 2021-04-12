@@ -108,7 +108,7 @@ func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress, 
 			Name:      ingress.Name,
 			Namespace: ingress.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(ingress, networkingv1beta1.SchemeGroupVersion.WithKind("Ingress")),
+				*metav1.NewControllerRef(ingress, ingress.GroupVersionKind()),
 			},
 			Labels: ingress.Labels,
 		},
