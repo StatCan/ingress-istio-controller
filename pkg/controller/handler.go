@@ -83,7 +83,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 
 	// If we don't have virtual service, then let's make one
 	if vs == nil {
-		vs, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Create(nvs)
+		_, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Create(nvs)
 		if err != nil {
 			return err
 		}
@@ -93,7 +93,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 		// Copy the new spec
 		vs.Spec = nvs.Spec
 
-		vs, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Update(vs)
+		_, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Update(vs)
 		if err != nil {
 			return err
 		}
