@@ -145,7 +145,7 @@ func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress, 
 			if strings.Contains(host, "*") {
 				authorityMatchType = v1beta1.StringMatch{
 					MatchType: &v1beta1.StringMatch_Regex{
-						Regex: strings.ReplaceAll(host, "*", ".*"),
+						Regex: strings.ReplaceAll(strings.ReplaceAll(host, ".", "\\."), "*", ".*"),
 					},
 				}
 			} else {
