@@ -37,7 +37,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 	// Check that we own this VirtualService
 	if vs != nil {
 		if !metav1.IsControlledBy(vs, ingress) {
-			msg := fmt.Sprintf("VirtualService %q/%q already exists and is not managed by Ingress", vs.Namespace, vs.Name)
+			msg := fmt.Sprintf("VirtualService \"%s/%s\" already exists and is not managed by Ingress", vs.Namespace, vs.Name)
 			c.recorder.Event(ingress, v1.EventTypeWarning, "ErrResourceExists", msg)
 			return fmt.Errorf("%s", msg)
 		}
@@ -48,7 +48,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 
 	// If the IngressClassAnnotation is set, handle. This takes precedence over the IngressClass.
 	if val, ok := ingress.Annotations[IngressClassAnnotation]; ok && c.ingressClass != "" && val == c.ingressClass {
-		klog.Infof("deprecated annotation %s=%s set and takes precedence over IngressClassName: %s/%s", IngressClassAnnotation, c.ingressClass, ingress.Namespace, ingress.Name)
+		klog.Infof("deprecated annotation %s=%s set and takes precedence over IngressClassName for Ingress: %s/%s", IngressClassAnnotation, c.ingressClass, ingress.Namespace, ingress.Name)
 		handle = true
 	}
 
@@ -57,7 +57,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 	if ingress.Spec.IngressClassName != nil && !handle {
 		ingressClass, err := c.ingressClassesLister.Get(*ingress.Spec.IngressClassName)
 		if err != nil {
-			klog.Error("error getting IngressClass")
+			klog.Error("error getting IngressClass %q", *ingress.Spec.IngressClassName)
 			return err
 		}
 
