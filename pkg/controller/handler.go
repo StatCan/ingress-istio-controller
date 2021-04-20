@@ -17,9 +17,14 @@ import (
 )
 
 var (
+	// Controller.ingressClass is expected as the value
 	IngressClassAnnotation = "kubernetes.io/ingress.class"
-	IgnoreAnnotation       = "ingress.statcan.gc.ca/ignore"
-	GatewaysAnnotation     = "ingress.statcan.gc.ca/gateways"
+	// boolean is expected for the value
+	IgnoreAnnotation = "ingress.statcan.gc.ca/ignore"
+	// Comma seperated list of Gateways in <namespace>/<name> format
+	GatewaysAnnotation = "ingress.statcan.gc.ca/gateways"
+	// The value verified in IngressClass.spec.controller
+	IngressIstioController = "ingress.statcan.gc.ca/ingress-istio-controller"
 )
 
 func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) error {
@@ -32,19 +37,34 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 	// Check that we own this VirtualService
 	if vs != nil {
 		if !metav1.IsControlledBy(vs, ingress) {
-			msg := fmt.Sprintf("VirtualService %q already exists and is not managed by Ingress", vs.Name)
+			msg := fmt.Sprintf("VirtualService %q/%q already exists and is not managed by Ingress", vs.Namespace, vs.Name)
 			c.recorder.Event(ingress, v1.EventTypeWarning, "ErrResourceExists", msg)
 			return fmt.Errorf("%s", msg)
 		}
 	}
 
-	// Check for conditions which cause us to ignore the Ingress
-	ignore := false
+	// Check for conditions which cause us to handle the Ingress
+	handle := false
 
-	// If we don't have an ingress class, then let's ignore it
-	if val, ok := ingress.Annotations[IngressClassAnnotation]; !ok || (c.ingressClass != "" && val != c.ingressClass) {
-		klog.Infof("ingress class not set or does not match %s: %s/%s", c.ingressClass, ingress.Namespace, ingress.Name)
-		ignore = true
+	// If the IngressClassAnnotation is set, handle. This takes precedence over the IngressClass.
+	if val, ok := ingress.Annotations[IngressClassAnnotation]; ok && c.ingressClass != "" && val == c.ingressClass {
+		klog.Infof("deprecated annotation %s=%s set and takes precedence over IngressClassName: %s/%s", IngressClassAnnotation, c.ingressClass, ingress.Namespace, ingress.Name)
+		handle = true
+	}
+
+	// Checks !handle so that we don't doublecheck to handle
+	// via the IngressClass if the annotation is set.
+	if ingress.Spec.IngressClassName != nil && !handle {
+		ingressClass, err := c.ingressClassesLister.Get(*ingress.Spec.IngressClassName)
+		if err != nil {
+			klog.Error("error getting IngressClass")
+			return err
+		}
+
+		if ingressClass.Spec.Controller == IngressIstioController {
+			klog.Infof("IngressClass set to %s - handling Ingress", IngressIstioController)
+			handle = true
+		}
 	}
 
 	// Explicit ignore annotation
@@ -53,10 +73,10 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 		if err != nil {
 			return fmt.Errorf("error parsing %s (%t): %v", IgnoreAnnotation, bval, err)
 		}
-		ignore = ignore || bval
+		handle = handle && !bval
 	}
 
-	if ignore {
+	if !handle {
 		// A VirtualService already exists, so let's delete it
 		if vs != nil {
 			klog.Infof("removing owned virtualservice: %s/%s", vs.Namespace, vs.Name)

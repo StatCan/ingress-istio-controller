@@ -41,6 +41,9 @@ type Controller struct {
 	ingressesLister  networkinglisters.IngressLister
 	ingressesSynched cache.InformerSynced
 
+	ingressClassesLister  networkinglisters.IngressClassLister
+	ingressClassesSynched cache.InformerSynced
+
 	servicesLister  corev1listers.ServiceLister
 	servicesSynched cache.InformerSynced
 
@@ -60,6 +63,7 @@ func NewController(
 	ingressClass string,
 	defaultWeight int,
 	ingressesInformer networkinginformers.IngressInformer,
+	ingressClassesInformer networkinginformers.IngressClassInformer,
 	servicesInformer corev1informers.ServiceInformer,
 	virtualServicesInformer istionetworkinginformers.VirtualServiceInformer) *Controller {
 
@@ -79,6 +83,8 @@ func NewController(
 		defaultWeight:          defaultWeight,
 		ingressesLister:        ingressesInformer.Lister(),
 		ingressesSynched:       ingressesInformer.Informer().HasSynced,
+		ingressClassesLister:   ingressClassesInformer.Lister(),
+		ingressClassesSynched:  ingressClassesInformer.Informer().HasSynced,
 		servicesLister:         servicesInformer.Lister(),
 		servicesSynched:        servicesInformer.Informer().HasSynced,
 		virtualServicesListers: virtualServicesInformer.Lister(),
@@ -121,7 +127,7 @@ func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
 	klog.Info("starting controller")
 
 	klog.Info("waiting for informer caches to sync")
-	if ok := cache.WaitForCacheSync(stopCh, c.ingressesSynched, c.servicesSynched, c.virtualServicesSynched); !ok {
+	if ok := cache.WaitForCacheSync(stopCh, c.ingressesSynched, c.ingressClassesSynched, c.servicesSynched, c.virtualServicesSynched); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
