@@ -9,7 +9,6 @@ jobs:
   pre-build-checks:
     runs-on: ubuntu-latest
     steps:
-    steps:
       -
         name: Login to DockerHub
         uses: docker/login-action@v1 
