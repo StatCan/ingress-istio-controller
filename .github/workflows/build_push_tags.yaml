@@ -1,4 +1,4 @@
-name: build_and_push
+name: build_and_push_tag
 on:
   push:
     tags:
