@@ -24,7 +24,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           push: true
-          tags: statcan/ingress-istio-controller:${{ env.GITHUB_SHA }}
+          tags: statcan/ingress-istio-controller:${env.GITHUB_SHA}
       -
         name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
