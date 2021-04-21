@@ -1,0 +1,33 @@
+name: build_and_push
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  # Any checks that run pre-build
+  pre-build-checks:
+    runs-on: ubuntu-latest
+    steps:
+    steps:
+      -
+        name: Login to DockerHub
+        uses: docker/login-action@v1 
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      -
+        name: Get and set tag
+        shell: bash
+        run: |
+          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+      -
+        name: Build and push
+        id: docker_build
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          tags: statcan/ingress-istio-controller:${{ env.TAG }}
+      -
+        name: Image digest
+        run: echo ${{ steps.docker_build.outputs.digest }}
