@@ -52,7 +52,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 
 	// If the IngressClassAnnotation is set, handle. This takes precedence over the IngressClass.
 	if val, ok := ingress.Annotations[IngressClassAnnotation]; ok && c.ingressClass != "" && val == c.ingressClass {
-		klog.Infof("deprecated annotation %s=%s set and takes precedence over IngressClassName for Ingress: %s/%s", IngressClassAnnotation, c.ingressClass, ingress.Namespace, ingress.Name)
+		klog.Infof("deprecated annotation %s=%s set and takes precedence over IngressClassName for Ingress: \"%s/%s\"", IngressClassAnnotation, c.ingressClass, ingress.Namespace, ingress.Name)
 		handle = true
 	}
 
@@ -83,12 +83,12 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 	if !handle {
 		// A VirtualService already exists, so let's delete it
 		if vs != nil {
-			klog.Infof("removing owned virtualservice: %s/%s", vs.Namespace, vs.Name)
+			klog.Infof("removing owned virtualservice: \"%s/%s\"", vs.Namespace, vs.Name)
 			err := c.istioclientset.NetworkingV1beta1().VirtualServices(vs.Namespace).Delete(ctx, vs.Name, metav1.DeleteOptions{})
 			return err
 		}
 
-		klog.Infof("skipping ingress: %s/%s", ingress.Namespace, ingress.Name)
+		klog.Infof("skipping ingress: \"%s/%s\"", ingress.Namespace, ingress.Name)
 		return nil
 	}
 
@@ -97,7 +97,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 
 	if val, ok := ingress.Annotations[GatewaysAnnotation]; ok {
 		gateways = strings.Split(val, ",")
-		klog.Infof("using override gateways for %s/%s: %s", ingress.Namespace, ingress.Name, gateways)
+		klog.Infof("using override gateways for \"%s/%s\": %s", ingress.Namespace, ingress.Name, gateways)
 	}
 
 	nvs, err := c.generateVirtualService(ingress, gateways)
@@ -112,7 +112,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 			return err
 		}
 	} else if !reflect.DeepEqual(vs.Spec, nvs.Spec) {
-		klog.Infof("updated virtual service %s/%s", vs.Namespace, vs.Name)
+		klog.Infof("updated virtual service \"%s/%s\"", vs.Namespace, vs.Name)
 
 		// Copy the new spec
 		vs.Spec = nvs.Spec
@@ -145,7 +145,7 @@ func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress, 
 
 	for _, rule := range ingress.Spec.Rules {
 		if rule.HTTP == nil {
-			return nil, fmt.Errorf("invalid ingress rule: %s/%s - no http definition", ingress.Namespace, ingress.Name)
+			return nil, fmt.Errorf("invalid ingress rule: \"%s/%s\" - no http definition", ingress.Namespace, ingress.Name)
 		}
 
 		// Add the host
@@ -227,7 +227,7 @@ func (c *Controller) getServicePort(namespace string, backend networkingv1beta1.
 			}
 		}
 
-		return 0, fmt.Errorf("cannot find port named %q in service %s/%s", backend.ServicePort.String(), namespace, service.Name)
+		return 0, fmt.Errorf("cannot find port named %q in service \"%s/%s\"", backend.ServicePort.String(), namespace, service.Name)
 	default:
 		return 0, fmt.Errorf("unknown backend service port type: %d", backend.ServicePort.Type)
 	}
