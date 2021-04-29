@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -28,6 +29,9 @@ var (
 )
 
 func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) error {
+
+	ctx := context.Background()
+
 	// Find an existing virtual service of the same name
 	vs, err := c.virtualServicesListers.VirtualServices(ingress.Namespace).Get(ingress.Name)
 	if err != nil && !errors.IsNotFound(err) {
@@ -80,7 +84,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 		// A VirtualService already exists, so let's delete it
 		if vs != nil {
 			klog.Infof("removing owned virtualservice: %s/%s", vs.Namespace, vs.Name)
-			err := c.istioclientset.NetworkingV1beta1().VirtualServices(vs.Namespace).Delete(vs.Name, &metav1.DeleteOptions{})
+			err := c.istioclientset.NetworkingV1beta1().VirtualServices(vs.Namespace).Delete(ctx, vs.Name, metav1.DeleteOptions{})
 			return err
 		}
 
@@ -103,7 +107,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 
 	// If we don't have virtual service, then let's make one
 	if vs == nil {
-		_, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Create(nvs)
+		_, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Create(ctx, nvs, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
@@ -113,7 +117,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 		// Copy the new spec
 		vs.Spec = nvs.Spec
 
-		_, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Update(vs)
+		_, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Update(ctx, vs, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -128,7 +132,7 @@ func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress, 
 			Name:      ingress.Name,
 			Namespace: ingress.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(ingress, ingress.GroupVersionKind()),
+				*metav1.NewControllerRef(ingress, networkingv1beta1.SchemeGroupVersion.WithKind("Ingress")),
 			},
 			Labels: ingress.Labels,
 		},
