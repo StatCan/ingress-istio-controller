@@ -17,6 +17,7 @@ jobs:
         id: meta
         uses: crazy-max/ghaction-docker-meta@v2
         with:
+          images: statcan/ingress-istio-controller
           labels: |
             org.opencontainers.image.vendor=Statistics Canada
       -
