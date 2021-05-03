@@ -49,16 +49,18 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 
 	// Check for conditions which cause us to handle the Ingress
 	handle := false
+	// Determines if the IngressClassAnnotation is set - to preserve backwards compatibility.
+	hasIngressClassAnnotations := false
 
 	// If the IngressClassAnnotation is set, handle. This takes precedence over the IngressClass.
-	if val, ok := ingress.Annotations[IngressClassAnnotation]; ok && c.ingressClass != "" && val == c.ingressClass {
+	if val, hasIngressClassAnnotations := ingress.Annotations[IngressClassAnnotation]; hasIngressClassAnnotations && c.ingressClass != "" && val == c.ingressClass {
 		klog.Infof("deprecated annotation %s=%s set and takes precedence over IngressClassName for Ingress: \"%s/%s\"", IngressClassAnnotation, c.ingressClass, ingress.Namespace, ingress.Name)
 		handle = true
 	}
 
-	// Checks !handle so that we don't doublecheck to handle
-	// via the IngressClass if the annotation is set.
-	if ingress.Spec.IngressClassName != nil && !handle {
+	// Ensure that if it has an IngressClassAnnotation, it doesn't handle via the
+	// ingressClassName so that previous behaviour is maintained.
+	if !hasIngressClassAnnotations && ingress.Spec.IngressClassName != nil {
 		ingressClass, err := c.ingressClassesLister.Get(*ingress.Spec.IngressClassName)
 		if err != nil {
 			klog.Error("error getting IngressClass %q", *ingress.Spec.IngressClassName)
