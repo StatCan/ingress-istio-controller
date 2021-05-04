@@ -162,6 +162,7 @@ func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress, 
 
 		// Add the path
 		for _, path := range rule.HTTP.Paths {
+
 			servicePort, err := c.getServicePort(ingress.Namespace, path.Backend)
 			if err != nil {
 				return nil, err
@@ -172,6 +173,7 @@ func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress, 
 			if strings.Contains(host, "*") {
 				authorityMatchType = v1beta1.StringMatch{
 					MatchType: &v1beta1.StringMatch_Regex{
+						// Convert to Regex which is required by Envoy.
 						Regex: strings.ReplaceAll(strings.ReplaceAll(host, ".", "\\."), "*", ".*"),
 					},
 				}
@@ -202,9 +204,8 @@ func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress, 
 				},
 			}
 
-			if path.Path != "" {
-				route.Match[0].Uri = createStringMatch(path.Path)
-			}
+			httpMatch := route.Match[0]
+			httpMatch.Uri = createStringMatch(path)
 
 			vs.Spec.Http = append(vs.Spec.Http, route)
 		}
