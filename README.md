@@ -19,7 +19,7 @@ The Canada wordmark and related graphics associated with this distribution are p
 
 ### Configurations
 There are two ways to alter the configuration of the **isto-ingress-controller**. 
-The first is via Command Line Arguments and the second is via annotations set on Ingresses.
+The first is via Command Line Arguments and the second is via Annotations set on Ingresses.
 
 #### Command Line Arguments
 
@@ -32,7 +32,13 @@ The first is via Command Line Arguments and the second is via annotations set on
 | --ingress-class          | ""                                           | The value of the ***kubernetes.io/ingress.class*** annotation set on Ingresses that should be handled by the controller.<br>If empty, only the IngressClass referenced by the IngressClassName on the Ingresses will be used to identify those that should be handled. |
 | --virtual-service-weight | 100                                          | The weight of the Virtual Service destination used by Istio for traffic shaping.                                                                                                                                                                                       |
 
-______________________
+#### Annotations
+Annotations can be set on Ingresses to change how the Controller behaves. Following are the annotations and their function:
+
+| Annotation                     | Description                                                                                                  | Value Type             | Example Values               |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------ | ---------------------- | ---------------------------- |
+| ingress.statcan.gc.ca/ignore   | Causes the controller to ignore the Ingress.                                                                 | boolean                | "true"                       |
+| ingress.statcan.gc.ca/gateways | Comma-separated list of Gateways that should be passed to the VirtualService instead of the default-gateway. | comma-separated string | mesh,production/prod-gateway |
 
 ## Contrôleur d'Istio pour Ingress
 

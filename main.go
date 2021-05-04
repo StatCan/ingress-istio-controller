@@ -12,8 +12,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
-
-	_ "k8s.io/client-go/plugin/pkg/client/auth/azure"
 )
 
 var (
