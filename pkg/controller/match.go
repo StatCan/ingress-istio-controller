@@ -21,6 +21,8 @@ import (
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Code adapted from
+// https://github.com/istio/istio/blob/985d7c3b444f039c21e1489f40b751fb584d3a15/pilot/pkg/config/kube/ingress/conversion.go#L155
 func createStringMatch(path networkingv1beta1.HTTPIngressPath) *v1beta1.StringMatch {
 	var stringMatch *v1beta1.StringMatch
 
@@ -51,6 +53,8 @@ func createStringMatch(path networkingv1beta1.HTTPIngressPath) *v1beta1.StringMa
 	return stringMatch
 }
 
+// Code taken from:
+// https://github.com/istio/istio/blob/985d7c3b444f039c21e1489f40b751fb584d3a15/pilot/pkg/config/kube/ingress/conversion.go#L309
 func createFallbackStringMatch(s string) *v1beta1.StringMatch {
 	if s == "" {
 		return nil
