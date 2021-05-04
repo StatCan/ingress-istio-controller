@@ -35,7 +35,7 @@ func createStringMatch(s string) *v1beta1.StringMatch {
 	}
 	if strings.HasSuffix(s, "/*") {
 		return &v1beta1.StringMatch{
-			MatchType: &v1beta1.StringMatch_Prefix{Prefix: strings.TrimSuffix(s, "/*")},
+			MatchType: &v1beta1.StringMatch_Prefix{Prefix: strings.TrimSuffix(s, "*")},
 		}
 	}
 

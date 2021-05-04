@@ -159,6 +159,7 @@ func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress, 
 
 		// Add the path
 		for _, path := range rule.HTTP.Paths {
+
 			servicePort, err := c.getServicePort(ingress.Namespace, path.Backend)
 			if err != nil {
 				return nil, err
@@ -169,6 +170,7 @@ func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress, 
 			if strings.Contains(host, "*") {
 				authorityMatchType = v1beta1.StringMatch{
 					MatchType: &v1beta1.StringMatch_Regex{
+						// Convert to Regex which is required by Envoy.
 						Regex: strings.ReplaceAll(strings.ReplaceAll(host, ".", "\\."), "*", ".*"),
 					},
 				}
@@ -199,8 +201,29 @@ func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress, 
 				},
 			}
 
-			if path.Path != "" {
-				route.Match[0].Uri = createStringMatch(path.Path)
+			httpMatch := route.Match[0]
+			if path.PathType != nil {
+				switch *path.PathType {
+				case networkingv1beta1.PathTypeExact:
+					httpMatch.Uri = &v1beta1.StringMatch{
+						MatchType: &v1beta1.StringMatch_Exact{Exact: path.Path},
+					}
+				case networkingv1beta1.PathTypePrefix:
+					// From the spec: /foo/bar matches /foo/bar/baz, but does not match /foo/barbaz
+					// Envoy prefix match behaves differently, so insert a / if we don't have one
+					path := path.Path
+					if !strings.HasSuffix(path, "/") {
+						path += "/"
+					}
+					httpMatch.Uri = &v1beta1.StringMatch{
+						MatchType: &v1beta1.StringMatch_Prefix{Prefix: path},
+					}
+				default:
+					// Fallback to the string matching
+					httpMatch.Uri = createStringMatch(path.Path)
+				}
+			} else {
+				httpMatch.Uri = createStringMatch(path.Path)
 			}
 
 			vs.Spec.Http = append(vs.Spec.Http, route)
