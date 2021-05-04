@@ -23,7 +23,7 @@ the IngressClass. The use of the annotation is still supported by this controlle
 precedence over the `IngressClass`.
 
 #### IngressClass
-An IngressClass can also be used. The controller will search for IngressClasses that have the `spec.controller` value of `ingress.statcan.gc.ca/ingress-istio-controller`.
+The controller will handle Ingresses with references to IngressClasses that have the `spec.controller` value of `ingress.statcan.gc.ca/ingress-istio-controller`.
 Following is an example of an IngressClass that can be used:
 
 ```yaml
