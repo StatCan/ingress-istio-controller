@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"istio.io/api/networking/v1beta1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 )
 
 // Copyright Istio Authors
@@ -20,7 +21,37 @@ import (
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-func createStringMatch(s string) *v1beta1.StringMatch {
+func createStringMatch(path networkingv1beta1.HTTPIngressPath) *v1beta1.StringMatch {
+	var stringMatch *v1beta1.StringMatch
+
+	if path.PathType != nil {
+		switch *path.PathType {
+		case networkingv1beta1.PathTypeExact:
+			stringMatch = &v1beta1.StringMatch{
+				MatchType: &v1beta1.StringMatch_Exact{Exact: path.Path},
+			}
+		case networkingv1beta1.PathTypePrefix:
+			// From the spec: /foo/bar matches /foo/bar/baz, but does not match /foo/barbaz
+			// Envoy prefix match behaves differently, so insert a / if we don't have one
+			path := path.Path
+			if !strings.HasSuffix(path, "/") {
+				path += "/"
+			}
+			stringMatch = &v1beta1.StringMatch{
+				MatchType: &v1beta1.StringMatch_Prefix{Prefix: path},
+			}
+		default:
+			// Fallback to the string matching
+			stringMatch = createFallbackStringMatch(path.Path)
+		}
+	} else {
+		stringMatch = createFallbackStringMatch(path.Path)
+	}
+
+	return stringMatch
+}
+
+func createFallbackStringMatch(s string) *v1beta1.StringMatch {
 	if s == "" {
 		return nil
 	}
