@@ -7,7 +7,7 @@ Based on https://github.com/kubernetes/sample-controller
 This controller is a reimplementation of the logic implemented by the [Istio Ingress](https://istio.io/latest/docs/tasks/traffic-management/ingress/kubernetes-ingress/)
 which creates VirtualServices based on Ingress objects and routes their traffic through a Gateway. 
 
-This reimplementation is du to that fact that in Istio 1.6, the core logic changed and instead of all of the generated VirtualServices routing through a single 
+This reimplementation is due to that fact that in Istio 1.6, the core logic changed and instead of all of the generated VirtualServices routing through a single 
 Gateway object, each VirtualService received their own. This caused issues for the Cloud Native Platform at Statistics Canada due to the fact that 
 a wildcard certificate is used to simplify application deployment. The issue is documented here: [istio/istio#24385](https://github.com/istio/istio/issues/24385).
 
@@ -85,9 +85,9 @@ Annotations can be set on Ingresses to change how the Controller behaves. Follow
 
 Basé sur https://github.com/kubernetes/sample-controller
 
-Ce crontrôleur est une ré-implémentation de la logique du [Istio Ingress *(anglais)*](https://istio.io/latest/docs/tasks/traffic-management/ingress/kubernetes-ingress/). Celui-ci crée des VirtualServices en utlisant des objets Ingress comme définition afin d'acheminer le trafic réseau par un Gateway.
+Ce contrôleur est une réimplémentation de la logique du [Istio Ingress *(anglais)*](https://istio.io/latest/docs/tasks/traffic-management/ingress/kubernetes-ingress/). Celui-ci crée des VirtualServices en utilisant des objets Ingress comme définition afin d'acheminer le trafic réseau par un Gateway.
 
-Cette réimplémentation est causé par le changement de la logique à partir d'Istio 1.6 causant qu'un Gateway unique est créé pour chaque VirtualService au lien d'un 
+Cette réimplémentation est causée par le changement de la logique à partir d'Istio 1.6 causant qu'un Gateway unique est créé pour chaque VirtualService au lien d'un 
 Gateway commun. Ce changement a causé des problèmes pour la Plateforme Infonuagique Native à Statistique Canada puisqu'un certificat générique est utilisé afin de simplifier le déploiement d'applications.
 
 ### Compatibilité et Fonctionnement
@@ -101,14 +101,14 @@ L'annotation `kubernetes.io/ingress.class` ainsi que l'objet IngressClass peuven
 #### Annotation `kubernetes.io/ingress.class`
 
 Débutant en Kubernetes 1.18, l'annotation `kubernetes.io/ingress.class` [est dépriciée *(anglais)*](https://kubernetes.io/docs/concepts/services-networking/ingress/#deprecated-annotation)
-en faveur de l'utilisation de l'IngressClass. Ceci dit, l'annotation peut encore être utilisée comme cible par ce contrôleur et comme documenté sur le
+en faveur de l'utilisation de l'IngressClass. Ceci dit, l'annotation peut encore être utilisée comme cible par ce contrôleur et comme documentée sur le
 [champ IngressClassName *(anglais)*](https://github.com/kubernetes/api/blob/648b77825832f4e96433407e4b406a3bdbb988bd/networking/v1beta1/types.go#L72), 
 aura préséance sur l'`IngressClass`.
 
 #### IngressClass
 
 Le contrôleur ciblera les Ingresses référant aux IngressClasses ayant comme valeur `ingress.statcan.gc.ca/ingress-istio-controller` au champ `spec.controller`.
-Ci-dessous est un example d'un IngressClass pouvant être utiliser:
+Ci-dessous est un exemple d'un IngressClass pouvant être utilisé:
 
 ```yaml
 apiVersion: networking.k8s.io/v1beta1
@@ -138,7 +138,7 @@ dépot [statcan/ingress-istio-controller](https://hub.docker.com/r/statcan/ingre
 
 ### Configuration
 
-Il y a deux façon d'altérer le fonctionnement du **isto-ingress-controller**. 
+Il y a deux façons d'altérer le fonctionnement de l'**isto-ingress-controller**. 
 La première étant des arguments de la ligne de commande et la deuxième étant des Annotations sur les Ingresses.
 
 #### Ligne de Commande
@@ -148,9 +148,9 @@ La première étant des arguments de la ligne de commande et la deuxième étant
 | --kubeconfig             | Le chemin de fichier local au kubeconfig. <br>*Seulement requis à l'extérieur du cluster.*                                                                                                                                                                       | ""                                           |
 | --master                 | L'adresse au serveur API de Kubernetes. Cet argument prendra l'avance des configurations du kubeconfig. <br>*Seulement requis à l'extérieur du cluster.*                                                                                                         | ""                                           |
 | --cluster-domain         | Le domaine du cluster.                                                                                                                                                                                                                                           | cluster.local                                |
-| --default-gateway        | Le nom de l'Istio Gateway duquel les VirtualServices seront servis. <br>L'argument devrait être en format **\<namespace>/\<nom>**.                                                                                                                               | istio-system/istio-autogenerated-k8s-ingress |
-| --ingress-class          | La valeur de l'Annotation ***kubernetes.io/ingress.class*** sur les Ingresses devrant être ciblés par le contrôleur.<br>Si la valeur est vide, seulement le IngressClass référé par IngressClassName dans les Ingresses sera utilisé comme paramêtre de ciblage. | ""                                           |
-| --virtual-service-weight | Le valeur proportionnelle de trafic réseau devrant être achimener au service.                                                                                                                                                                                    | 100                                          |
+| --default-gateway        | Le nom de l'Istio Gateway duquel les VirtualServices seront servit. <br>L'argument devrait être en format **\<namespace>/\<nom>**.                                                                                                                               | istio-system/istio-autogenerated-k8s-ingress |
+| --ingress-class          | La valeur de l'Annotation ***kubernetes.io/ingress.class*** sur les Ingresses devrant être ciblés par le contrôleur.<br>Si la valeur est vide, seulement le IngressClass référé par IngressClassName dans les Ingresses sera utilisé comme paramètre de ciblage. | ""                                           |
+| --virtual-service-weight | La valeur proportionnelle de trafic réseau devrant être achimenée au service.                                                                                                                                                                                    | 100                                          |
 
 #### Annotations
 
