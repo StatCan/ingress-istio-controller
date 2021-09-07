@@ -1,4 +1,4 @@
-module github.com/statcan/ingress-istio-controller
+module github.com/StatCan/ingress-istio-controller
 
 go 1.15
 

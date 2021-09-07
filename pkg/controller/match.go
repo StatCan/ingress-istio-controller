@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"istio.io/api/networking/v1beta1"
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 )
 
 // Copyright Istio Authors
@@ -23,16 +23,16 @@ import (
 
 // Code adapted from
 // https://github.com/istio/istio/blob/985d7c3b444f039c21e1489f40b751fb584d3a15/pilot/pkg/config/kube/ingress/conversion.go#L155
-func createStringMatch(path networkingv1beta1.HTTPIngressPath) *v1beta1.StringMatch {
+func createStringMatch(path networkingv1.HTTPIngressPath) *v1beta1.StringMatch {
 	var stringMatch *v1beta1.StringMatch
 
 	if path.PathType != nil {
 		switch *path.PathType {
-		case networkingv1beta1.PathTypeExact:
+		case networkingv1.PathTypeExact:
 			stringMatch = &v1beta1.StringMatch{
 				MatchType: &v1beta1.StringMatch_Exact{Exact: path.Path},
 			}
-		case networkingv1beta1.PathTypePrefix:
+		case networkingv1.PathTypePrefix:
 			// From the spec: /foo/bar matches /foo/bar/baz, but does not match /foo/barbaz
 			// Envoy prefix match behaves differently, so insert a / if we don't have one
 			path := path.Path
