@@ -10,10 +10,9 @@ import (
 	"istio.io/api/networking/v1beta1"
 	istionetworkingv1beta1 "istio.io/client-go/pkg/apis/networking/v1beta1"
 	v1 "k8s.io/api/core/v1"
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog"
 )
 
@@ -28,7 +27,7 @@ var (
 	IngressIstioController = "ingress.statcan.gc.ca/ingress-istio-controller"
 )
 
-func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) error {
+func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
 
 	ctx := context.Background()
 
@@ -129,13 +128,13 @@ func (c *Controller) handleVirtualService(ingress *networkingv1beta1.Ingress) er
 	return nil
 }
 
-func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress, gateways []string) (*istionetworkingv1beta1.VirtualService, error) {
+func (c *Controller) generateVirtualService(ingress *networkingv1.Ingress, gateways []string) (*istionetworkingv1beta1.VirtualService, error) {
 	vs := &istionetworkingv1beta1.VirtualService{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ingress.Name,
 			Namespace: ingress.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(ingress, networkingv1beta1.SchemeGroupVersion.WithKind("Ingress")),
+				*metav1.NewControllerRef(ingress, networkingv1.SchemeGroupVersion.WithKind("Ingress")),
 			},
 			Labels: ingress.Labels,
 		},
@@ -194,7 +193,7 @@ func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress, 
 				Route: []*v1beta1.HTTPRouteDestination{
 					{
 						Destination: &v1beta1.Destination{
-							Host: fmt.Sprintf("%s.%s.svc.%s", path.Backend.ServiceName, ingress.Namespace, c.clusterDomain),
+							Host: fmt.Sprintf("%s.%s.svc.%s", path.Backend.Service.Name, ingress.Namespace, c.clusterDomain),
 							Port: &v1beta1.PortSelector{
 								Number: servicePort,
 							},
@@ -214,25 +213,22 @@ func (c *Controller) generateVirtualService(ingress *networkingv1beta1.Ingress, 
 	return vs, nil
 }
 
-func (c *Controller) getServicePort(namespace string, backend networkingv1beta1.IngressBackend) (uint32, error) {
-	switch backend.ServicePort.Type {
-	case intstr.Int:
-		return uint32(backend.ServicePort.IntValue()), nil
-	case intstr.String:
+func (c *Controller) getServicePort(namespace string, backend networkingv1.IngressBackend) (uint32, error) {
+	if backend.Service.Port.Number > 0 {
+		return uint32(backend.Service.Port.Number), nil
+	} else if backend.Service.Port.Name != "" {
 		// Find the service and conver the service name to a port
-		service, err := c.servicesLister.Services(namespace).Get(backend.ServiceName)
+		service, err := c.servicesLister.Services(namespace).Get(backend.Service.Name)
 		if err != nil {
 			return 0, err
 		}
 
 		for _, port := range service.Spec.Ports {
-			if port.Name == backend.ServicePort.String() {
+			if port.Name == backend.Service.Port.Name {
 				return uint32(port.Port), nil
 			}
 		}
-
-		return 0, fmt.Errorf("cannot find port named %q in service \"%s/%s\"", backend.ServicePort.String(), namespace, service.Name)
-	default:
-		return 0, fmt.Errorf("unknown backend service port type: %d", backend.ServicePort.Type)
 	}
+
+	return 0, fmt.Errorf("unknown backend service port type")
 }

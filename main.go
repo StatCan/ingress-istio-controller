@@ -54,8 +54,8 @@ func main() {
 		defaultGateway,
 		ingressClass,
 		defaultWeight,
-		kubeInformerFactory.Networking().V1beta1().Ingresses(),
-		kubeInformerFactory.Networking().V1beta1().IngressClasses(),
+		kubeInformerFactory.Networking().V1().Ingresses(),
+		kubeInformerFactory.Networking().V1().IngressClasses(),
 		kubeInformerFactory.Core().V1().Services(),
 		istioInformerFactory.Networking().V1beta1().VirtualServices())
 
