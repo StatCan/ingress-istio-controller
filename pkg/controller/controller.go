@@ -27,6 +27,7 @@ import (
 )
 
 const controllerAgentName = "ingress-istio-controller"
+const controllerAgentVersion = "canary"
 
 // Controller responds to new resources and applies the necessary configuration
 type Controller struct {
