@@ -119,8 +119,8 @@ func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
 		uvs := vs.DeepCopy()
 
 		// Copy the new spec
-		uvs.ObjectMeta.Annotations = nvs.ObjectMeta.Annotations
 		uvs.ObjectMeta.Labels = nvs.ObjectMeta.Labels
+		uvs.ObjectMeta.Annotations = nvs.ObjectMeta.Annotations
 		uvs.Spec = nvs.Spec
 
 		_, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Update(ctx, uvs, metav1.UpdateOptions{})
@@ -134,8 +134,8 @@ func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
 
 func generateObjectMetadata(ingress *networkingv1.Ingress, existingVirtualService *istionetworkingv1beta1.VirtualService) (labels map[string]string, annotations map[string]string) {
 	if existingVirtualService != nil {
-		labels = ingress.DeepCopy().Labels
-		annotations = ingress.DeepCopy().Annotations
+		labels = existingVirtualService.DeepCopy().Labels
+		annotations = existingVirtualService.DeepCopy().Annotations
 	}
 
 	if labels == nil {
@@ -163,8 +163,8 @@ func generateObjectMetadata(ingress *networkingv1.Ingress, existingVirtualServic
 	return
 }
 
-func (c *Controller) generateVirtualService(ingress *networkingv1.Ingress, existing *istionetworkingv1beta1.VirtualService, gateways []string) (*istionetworkingv1beta1.VirtualService, error) {
-	labels, annotations := generateObjectMetadata(ingress, existing)
+func (c *Controller) generateVirtualService(ingress *networkingv1.Ingress, existingVirtualService *istionetworkingv1beta1.VirtualService, gateways []string) (*istionetworkingv1beta1.VirtualService, error) {
+	labels, annotations := generateObjectMetadata(ingress, existingVirtualService)
 
 	vs := &istionetworkingv1beta1.VirtualService{
 		ObjectMeta: metav1.ObjectMeta{
