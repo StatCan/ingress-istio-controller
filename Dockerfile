@@ -14,7 +14,8 @@ RUN go mod download
 
 # Build
 COPY . .
-RUN CGO_ENABLED=0 go build
+ARG VERSION=development
+RUN CGO_ENABLED=0 go build -ldflags "-X github.com/StatCan/ingress-istio-controller/pkg/controller.controllerAgentVersion=${VERSION}"
 
 # Generate final image
 FROM scratch
