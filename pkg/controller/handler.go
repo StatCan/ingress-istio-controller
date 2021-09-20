@@ -9,10 +9,9 @@ import (
 
 	"istio.io/api/networking/v1beta1"
 	istionetworkingv1beta1 "istio.io/client-go/pkg/apis/networking/v1beta1"
-	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog"
 )
 
@@ -27,23 +26,29 @@ var (
 	IngressIstioController = "ingress.statcan.gc.ca/ingress-istio-controller"
 )
 
-func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
+func (c *Controller) findExistingVirtualServiceForIngress(ingress *networkingv1.Ingress) (*istionetworkingv1beta1.VirtualService, error) {
+	vss, err := c.virtualServicesListers.VirtualServices(ingress.Namespace).List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
 
+	for _, vs := range vss {
+		if metav1.IsControlledBy(vs, ingress) {
+			return vs, nil
+		}
+	}
+
+	// No VirtualService was matched
+	return nil, nil
+}
+
+func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
 	ctx := context.Background()
 
 	// Find an existing virtual service of the same name
-	vs, err := c.virtualServicesListers.VirtualServices(ingress.Namespace).Get(ingress.Name)
-	if err != nil && !errors.IsNotFound(err) {
+	vs, err := c.findExistingVirtualServiceForIngress(ingress)
+	if err != nil {
 		return err
-	}
-
-	// Check that we own this VirtualService
-	if vs != nil {
-		if !metav1.IsControlledBy(vs, ingress) {
-			msg := fmt.Sprintf("VirtualService \"%s/%s\" already exists and is not managed by Ingress", vs.Namespace, vs.Name)
-			c.recorder.Event(ingress, v1.EventTypeWarning, "ErrResourceExists", msg)
-			return fmt.Errorf("%s", msg)
-		}
 	}
 
 	// Check for conditions which cause us to handle the Ingress
@@ -131,8 +136,8 @@ func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
 func (c *Controller) generateVirtualService(ingress *networkingv1.Ingress, gateways []string) (*istionetworkingv1beta1.VirtualService, error) {
 	vs := &istionetworkingv1beta1.VirtualService{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ingress.Name,
-			Namespace: ingress.Namespace,
+			GenerateName: fmt.Sprintf("%s-", ingress.Name),
+			Namespace:    ingress.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(ingress, networkingv1.SchemeGroupVersion.WithKind("Ingress")),
 			},
