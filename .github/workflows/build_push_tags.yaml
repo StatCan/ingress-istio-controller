@@ -29,7 +29,7 @@ jobs:
             org.opencontainers.image.licenses=https://github.com/StatCan/ingress-istio-controller/blob/${{ env.GIT_SHA }}/LICENSE
       -
         name: Login to DockerHub
-        uses: docker/login-action@v1 
+        uses: docker/login-action@v1
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -41,6 +41,8 @@ jobs:
           push: true
           tags: statcan/ingress-istio-controller:${{ env.TAG }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ env.TAG }}
       -
         name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}

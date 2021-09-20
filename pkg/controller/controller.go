@@ -26,7 +26,8 @@ import (
 	"k8s.io/klog"
 )
 
-const controllerAgentName = "ingress-istio-controller"
+var controllerAgentName = "ingress-istio-controller"
+var controllerAgentVersion = "development"
 
 // Controller responds to new resources and applies the necessary configuration
 type Controller struct {
@@ -66,6 +67,7 @@ func NewController(
 	ingressClassesInformer networkinginformers.IngressClassInformer,
 	servicesInformer corev1informers.ServiceInformer,
 	virtualServicesInformer istionetworkinginformers.VirtualServiceInformer) *Controller {
+	klog.Infof("setting up controller %s: %s", controllerAgentName, controllerAgentVersion)
 
 	// Create event broadcaster
 	klog.V(4).Info("creating event broadcaster")

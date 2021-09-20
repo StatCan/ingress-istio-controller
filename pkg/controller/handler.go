@@ -107,7 +107,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
 		klog.Infof("using override gateways for \"%s/%s\": %s", ingress.Namespace, ingress.Name, gateways)
 	}
 
-	nvs, err := c.generateVirtualService(ingress, gateways)
+	nvs, err := c.generateVirtualService(ingress, vs, gateways)
 	if err != nil {
 		return err
 	}
@@ -118,13 +118,17 @@ func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
 		if err != nil {
 			return err
 		}
-	} else if !reflect.DeepEqual(vs.Spec, nvs.Spec) {
-		klog.Infof("updated virtual service \"%s/%s\"", vs.Namespace, vs.Name)
+	} else if !reflect.DeepEqual(vs.ObjectMeta.Labels, nvs.ObjectMeta.Labels) || !reflect.DeepEqual(vs.ObjectMeta.Annotations, nvs.ObjectMeta.Annotations) || !reflect.DeepEqual(vs.Spec, nvs.Spec) {
+		klog.Infof("updating virtual service \"%s/%s\"", vs.Namespace, vs.Name)
+
+		uvs := vs.DeepCopy()
 
 		// Copy the new spec
-		vs.Spec = nvs.Spec
+		uvs.ObjectMeta.Labels = nvs.ObjectMeta.Labels
+		uvs.ObjectMeta.Annotations = nvs.ObjectMeta.Annotations
+		uvs.Spec = nvs.Spec
 
-		_, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Update(ctx, vs, metav1.UpdateOptions{})
+		_, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Update(ctx, uvs, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -133,7 +137,40 @@ func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
 	return nil
 }
 
-func (c *Controller) generateVirtualService(ingress *networkingv1.Ingress, gateways []string) (*istionetworkingv1beta1.VirtualService, error) {
+func generateObjectMetadata(ingress *networkingv1.Ingress, existingVirtualService *istionetworkingv1beta1.VirtualService) (labels map[string]string, annotations map[string]string) {
+	if existingVirtualService != nil {
+		labels = existingVirtualService.DeepCopy().Labels
+		annotations = existingVirtualService.DeepCopy().Annotations
+	}
+
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
+	// Overwrite with metadata from ingress
+	for k, v := range ingress.Labels {
+		labels[k] = v
+	}
+
+	for k, v := range ingress.Annotations {
+		annotations[k] = v
+	}
+
+	// Overwrite metadata with controller information
+	labels["app.kubernetes.io/managed-by"] = controllerAgentName
+	labels["app.kubernetes.io/created-by"] = controllerAgentName
+	annotations["meta.statcan.gc.ca/version"] = controllerAgentVersion
+
+	return
+}
+
+func (c *Controller) generateVirtualService(ingress *networkingv1.Ingress, existingVirtualService *istionetworkingv1beta1.VirtualService, gateways []string) (*istionetworkingv1beta1.VirtualService, error) {
+	labels, annotations := generateObjectMetadata(ingress, existingVirtualService)
+
 	vs := &istionetworkingv1beta1.VirtualService{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("%s-", ingress.Name),
@@ -141,7 +178,8 @@ func (c *Controller) generateVirtualService(ingress *networkingv1.Ingress, gatew
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(ingress, networkingv1.SchemeGroupVersion.WithKind("Ingress")),
 			},
-			Labels: ingress.Labels,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: v1beta1.VirtualService{
 			Gateways: gateways,

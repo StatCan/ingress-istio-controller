@@ -3,3 +3,4 @@ ingress-istio-controller
 .DS_Store
 .vscode
 __debug_bin
+bin/

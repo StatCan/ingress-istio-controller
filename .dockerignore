@@ -6,3 +6,6 @@ LICENSE
 .git*
 Dockerfile
 deploy/
+Makefile
+.github/
+bin/
