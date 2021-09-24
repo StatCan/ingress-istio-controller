@@ -31,7 +31,7 @@ The controller will handle Ingresses with references to IngressClasses that have
 Following is an example of an IngressClass that can be used:
 
 ```yaml
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: IngressClass
 metadata:
   name: ingress-istio-controller
