@@ -5,23 +5,23 @@
 Based on https://github.com/kubernetes/sample-controller
 
 This controller is a reimplementation of the logic implemented by the [Istio Ingress](https://istio.io/latest/docs/tasks/traffic-management/ingress/kubernetes-ingress/)
-which creates VirtualServices based on Ingress objects and routes their traffic through a Gateway. 
+which creates VirtualServices based on Ingress objects and routes their traffic through a Gateway.
 
-This reimplementation is due to that fact that in Istio 1.6, the core logic changed and instead of all of the generated VirtualServices routing through a single 
-Gateway object, each VirtualService received their own. This caused issues for the Cloud Native Platform at Statistics Canada due to the fact that 
+This reimplementation is due to that fact that in Istio 1.6, the core logic changed and instead of all of the generated VirtualServices routing through a single
+Gateway object, each VirtualService received their own. This caused issues for the Cloud Native Platform at Statistics Canada due to the fact that
 a wildcard certificate is used to simplify application deployment. The issue is documented here: [istio/istio#24385](https://github.com/istio/istio/issues/24385).
 
 ### Compatibility and Behaviour
 
-This controller is designed and tested to work with the `istio.io/api/networking/v1beta1` and `k8s.io/api/networking/v1beta1` APIs. 
-It has been tested to run on Istio 1.5 and Kubernetes 1.17 and 1.18, however, it should work with all versions of Istio.
+This controller is designed and tested to work with the `istio.io/api/networking/v1beta1` and `k8s.io/api/networking/v1`  APIs.
+It has been tested to run on Istio 1.5, 1.6, and 1.7 and on Kubernetes 1.17, 1.18, and 1.19, however, it should work with all versions of Istio.
 
 Both the `kubernetes.io/ingress.class` annotation and the IngressClass can be used as a way to identify the Ingresses that should be handled by the controller.
 
 #### `kubernetes.io/ingress.class` Annotation
 
-Starting with Kubernetes 1.18, `kubernetes.io/ingress.class` [is deprecated](https://kubernetes.io/docs/concepts/services-networking/ingress/#deprecated-annotation) in favour of 
-the IngressClass. The use of the annotation is still supported by this controller and by design, as defined in the documentation of the 
+Starting with Kubernetes 1.18, `kubernetes.io/ingress.class` [is deprecated](https://kubernetes.io/docs/concepts/services-networking/ingress/#deprecated-annotation) in favour of
+the IngressClass. The use of the annotation is still supported by this controller and by design, as defined in the documentation of the
 [IngressClassName field](https://github.com/kubernetes/api/blob/648b77825832f4e96433407e4b406a3bdbb988bd/networking/v1beta1/types.go#L72), will take
 precedence over the `IngressClass`.
 
@@ -47,18 +47,18 @@ See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 Unless otherwise noted, the source code of this project is covered under Crown Copyright, Government of Canada, and is distributed under the [MIT License](LICENSE).
 
-The Canada wordmark and related graphics associated with this distribution are protected under trademark law and copyright law. 
-No permission is granted to use them outside the parameters of the Government of Canada's corporate identity program. 
+The Canada wordmark and related graphics associated with this distribution are protected under trademark law and copyright law.
+No permission is granted to use them outside the parameters of the Government of Canada's corporate identity program.
 For more information, see [Federal identity requirements](https://www.canada.ca/en/treasury-board-secretariat/topics/government-communications/federal-identity-requirements.html).
 
 ### Installation
 
-A Helm chart is available from the [StatCan/Charts repository](https://github.com/statcan/charts/stable/ingress-istio-controller) and images can be found in the 
+A Helm chart is available from the [StatCan/Charts repository](https://github.com/statcan/charts/stable/ingress-istio-controller) and images can be found in the
 [statcan/ingress-istio-controller](https://hub.docker.com/r/statcan/ingress-istio-controller).
 
 ### Configuration
 
-There are two ways to alter the behaviour of the **isto-ingress-controller**. 
+There are two ways to alter the behaviour of the **isto-ingress-controller**.
 The first is via Command Line Arguments and the second is via Annotations set on Ingresses.
 
 #### Command Line Arguments
@@ -87,13 +87,13 @@ Basé sur https://github.com/kubernetes/sample-controller
 
 Ce contrôleur est une réimplémentation de la logique du [Istio Ingress *(anglais)*](https://istio.io/latest/docs/tasks/traffic-management/ingress/kubernetes-ingress/). Celui-ci crée des VirtualServices en utilisant des objets Ingress comme définition afin d'acheminer le trafic réseau par un Gateway.
 
-Cette réimplémentation est causée par le changement de la logique à partir d'Istio 1.6 causant qu'un Gateway unique est créé pour chaque VirtualService au lien d'un 
+Cette réimplémentation est causée par le changement de la logique à partir d'Istio 1.6 causant qu'un Gateway unique est créé pour chaque VirtualService au lien d'un
 Gateway commun. Ce changement a causé des problèmes pour la Plateforme Infonuagique Native à Statistique Canada puisqu'un certificat générique est utilisé afin de simplifier le déploiement d'applications.
 
 ### Compatibilité et Fonctionnement
 
-Ce crontrôleur est conçu et fonctionne avec les API `istio.io/api/networking/v1beta1` et `k8s.io/api/networking/v1beta1`.
-Il a été testé avec la version 1.5 d'Istio et les versions 1.17 et 1.18 de Kubernetes. Ceci dit, il devrait être compatible avec toutes versions d'Istio.
+Ce crontrôleur est conçu et fonctionne avec les API `istio.io/api/networking/v1beta1` et `k8s.io/api/networking/v1`.
+Il a été testé avec les versions 1.5, 1.6 et 1.7 d'Istio et les versions 1.17, 1.18 et 1.19 de Kubernetes. Ceci dit, il devrait être compatible avec toutes versions d'Istio.
 
 L'annotation `kubernetes.io/ingress.class` ainsi que l'objet IngressClass peuvent être utilisés afin de cibler les Ingresses devrant être gérer par le contrôleur.
 
@@ -102,7 +102,7 @@ L'annotation `kubernetes.io/ingress.class` ainsi que l'objet IngressClass peuven
 
 Débutant en Kubernetes 1.18, l'annotation `kubernetes.io/ingress.class` [est dépriciée *(anglais)*](https://kubernetes.io/docs/concepts/services-networking/ingress/#deprecated-annotation)
 en faveur de l'utilisation de l'IngressClass. Ceci dit, l'annotation peut encore être utilisée comme cible par ce contrôleur et comme documentée sur le
-[champ IngressClassName *(anglais)*](https://github.com/kubernetes/api/blob/648b77825832f4e96433407e4b406a3bdbb988bd/networking/v1beta1/types.go#L72), 
+[champ IngressClassName *(anglais)*](https://github.com/kubernetes/api/blob/648b77825832f4e96433407e4b406a3bdbb988bd/networking/v1beta1/types.go#L72),
 aura préséance sur l'`IngressClass`.
 
 #### IngressClass
@@ -127,18 +127,18 @@ Voir [CONTRIBUTING.md](CONTRIBUTING.md)
 
 Sauf indication contraire, le code source de ce projet est protégé par le droit d'auteur de la Couronne du gouvernement du Canada et distribué sous la [licence MIT](LICENSE).
 
-Le mot-symbole « Canada » et les éléments graphiques connexes liés à cette distribution sont protégés en vertu des lois portant sur les marques de commerce et le droit d'auteur. 
-Aucune autorisation n'est accordée pour leur utilisation à l'extérieur des paramètres du programme de coordination de l'image de marque du gouvernement du Canada. 
+Le mot-symbole « Canada » et les éléments graphiques connexes liés à cette distribution sont protégés en vertu des lois portant sur les marques de commerce et le droit d'auteur.
+Aucune autorisation n'est accordée pour leur utilisation à l'extérieur des paramètres du programme de coordination de l'image de marque du gouvernement du Canada.
 Pour obtenir davantage de renseignements à ce sujet, veuillez consulter les [Exigences pour l'image de marque](https://www.canada.ca/fr/secretariat-conseil-tresor/sujets/communications-gouvernementales/exigences-image-marque.html).
 
 ### Installation
 
-Un chart Helm est publié dans le [dépot StatCan/charts](https://github.com/statcan/charts/stable/ingress-istio-controller) et des images Docker sont publiés dans le 
+Un chart Helm est publié dans le [dépot StatCan/charts](https://github.com/statcan/charts/stable/ingress-istio-controller) et des images Docker sont publiés dans le
 dépot [statcan/ingress-istio-controller](https://hub.docker.com/r/statcan/ingress-istio-controller).
 
 ### Configuration
 
-Il y a deux façons d'altérer le fonctionnement de l'**isto-ingress-controller**. 
+Il y a deux façons d'altérer le fonctionnement de l'**isto-ingress-controller**.
 La première étant des arguments de la ligne de commande et la deuxième étant des Annotations sur les Ingresses.
 
 #### Ligne de Commande
