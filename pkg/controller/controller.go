@@ -36,6 +36,7 @@ type Controller struct {
 
 	clusterDomain  string
 	defaultGateway string
+	scopedGateways bool
 	ingressClass   string
 	defaultWeight  int
 
@@ -64,6 +65,7 @@ func NewController(
 	istioclientset istio.Interface,
 	clusterDomain string,
 	defaultGateway string,
+	scopedGateways bool,
 	ingressClass string,
 	defaultWeight int,
 	ingressesInformer networkinginformers.IngressInformer,
@@ -86,6 +88,7 @@ func NewController(
 		clusterDomain:          clusterDomain,
 		defaultGateway:         defaultGateway,
 		ingressClass:           ingressClass,
+		scopedGateways:         scopedGateways,
 		defaultWeight:          defaultWeight,
 		ingressesLister:        ingressesInformer.Lister(),
 		ingressesSynched:       ingressesInformer.Informer().HasSynced,
@@ -211,9 +214,16 @@ func (c *Controller) syncHandler(key string) error {
 	}
 
 	// Handle the VirtualService
-	err = c.handleVirtualService(ingress)
+	vs, err := c.handleVirtualServiceForIngress(ingress)
 	if err != nil {
 		klog.Errorf("failed to handle virtual service: %v", err)
+		return err
+	}
+
+	// Handle the Ingress status
+	_, err = c.handleIngressStatus(ingress, vs)
+	if err != nil {
+		klog.Errorf("failed to handle Ingress status: %v", err)
 		return err
 	}
 
