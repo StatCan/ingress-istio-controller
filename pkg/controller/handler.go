@@ -114,7 +114,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
 
 	// If we don't have virtual service, then let's make one
 	if vs == nil {
-		_, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Create(ctx, nvs, metav1.CreateOptions{})
+		vs, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Create(ctx, nvs, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
@@ -128,9 +128,48 @@ func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
 		uvs.ObjectMeta.Annotations = nvs.ObjectMeta.Annotations
 		uvs.Spec = nvs.Spec
 
-		_, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Update(ctx, uvs, metav1.UpdateOptions{})
+		vs, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Update(ctx, uvs, metav1.UpdateOptions{})
 		if err != nil {
 			return err
+		}
+	}
+
+	// Check if we have an IP address on the first gateway associated
+	// with the  Virtual Service and sync it to the Ingress.
+	oid := strings.Split(vs.Spec.Gateways[0], "/")
+	if len(oid) == 1 {
+		oid[1] = oid[0]
+		oid[0] = vs.Namespace
+	}
+
+	gateway, err := c.gatewaysListers.Gateways(oid[0]).Get(oid[1])
+	if err != nil {
+		klog.Errorf("failed to load gateway \"%s/%s\": %v", oid[0], oid[1], err)
+		return err
+	}
+
+	if gateway != nil {
+		services, err := c.servicesLister.List(labels.SelectorFromSet(gateway.Spec.Selector))
+		if err != nil {
+			return err
+		}
+
+		if len(services) > 0 {
+			service := services[0]
+
+			if !reflect.DeepEqual(ingress.Status.LoadBalancer, service.Status.LoadBalancer) {
+				klog.Infof("updating ingress status for \"%s/%s\"", ingress.Namespace, ingress.Name)
+				updateIngress := ingress.DeepCopy()
+				updateIngress.Status.LoadBalancer = *service.Status.LoadBalancer.DeepCopy()
+
+				_, err := c.kubeclientset.NetworkingV1().Ingresses(updateIngress.Namespace).UpdateStatus(ctx, updateIngress, metav1.UpdateOptions{})
+				if err != nil {
+					klog.Errorf("failed to update ingress status for \"%s/%s\": %v", updateIngress.Namespace, updateIngress.Name, err)
+					return err
+				}
+			}
+		} else {
+			klog.Infof("could not find Service resource associated with Gateway \"%s/%s\"", gateway.Namespace, gateway.Name)
 		}
 	}
 

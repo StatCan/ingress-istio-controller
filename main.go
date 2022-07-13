@@ -57,7 +57,8 @@ func main() {
 		kubeInformerFactory.Networking().V1().Ingresses(),
 		kubeInformerFactory.Networking().V1().IngressClasses(),
 		kubeInformerFactory.Core().V1().Services(),
-		istioInformerFactory.Networking().V1beta1().VirtualServices())
+		istioInformerFactory.Networking().V1beta1().VirtualServices(),
+		istioInformerFactory.Networking().V1beta1().Gateways())
 
 	kubeInformerFactory.Start(stopCh)
 	istioInformerFactory.Start(stopCh)
