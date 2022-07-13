@@ -54,7 +54,7 @@ func (c *Controller) handleIngressStatus(ingress *networkingv1.Ingress, vs *isti
 	return ingress, nil
 }
 
-// getGatewayForVirtualService will get the gateways associated with the Virtual Service.
+// getGatewaysForVirtualService will get the gateways associated with the Virtual Service.
 func (c *Controller) getGatewaysForVirtualService(vs *istionetworkingv1beta1.VirtualService) ([]*istionetworkingv1beta1.Gateway, error) {
 	gateways := []*istionetworkingv1beta1.Gateway{}
 
