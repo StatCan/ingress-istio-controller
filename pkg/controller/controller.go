@@ -36,6 +36,7 @@ type Controller struct {
 
 	clusterDomain  string
 	defaultGateway string
+	scopedGateways bool
 	ingressClass   string
 	defaultWeight  int
 
@@ -51,6 +52,9 @@ type Controller struct {
 	virtualServicesListers istionetworkinglisters.VirtualServiceLister
 	virtualServicesSynched cache.InformerSynced
 
+	gatewaysListers istionetworkinglisters.GatewayLister
+	gatewaysSynched cache.InformerSynced
+
 	workqueue workqueue.RateLimitingInterface
 	recorder  record.EventRecorder
 }
@@ -61,12 +65,14 @@ func NewController(
 	istioclientset istio.Interface,
 	clusterDomain string,
 	defaultGateway string,
+	scopedGateways bool,
 	ingressClass string,
 	defaultWeight int,
 	ingressesInformer networkinginformers.IngressInformer,
 	ingressClassesInformer networkinginformers.IngressClassInformer,
 	servicesInformer corev1informers.ServiceInformer,
-	virtualServicesInformer istionetworkinginformers.VirtualServiceInformer) *Controller {
+	virtualServicesInformer istionetworkinginformers.VirtualServiceInformer,
+	gatewaysInformer istionetworkinginformers.GatewayInformer) *Controller {
 	klog.Infof("setting up controller %s: %s", controllerAgentName, controllerAgentVersion)
 
 	// Create event broadcaster
@@ -82,6 +88,7 @@ func NewController(
 		clusterDomain:          clusterDomain,
 		defaultGateway:         defaultGateway,
 		ingressClass:           ingressClass,
+		scopedGateways:         scopedGateways,
 		defaultWeight:          defaultWeight,
 		ingressesLister:        ingressesInformer.Lister(),
 		ingressesSynched:       ingressesInformer.Informer().HasSynced,
@@ -91,6 +98,8 @@ func NewController(
 		servicesSynched:        servicesInformer.Informer().HasSynced,
 		virtualServicesListers: virtualServicesInformer.Lister(),
 		virtualServicesSynched: virtualServicesInformer.Informer().HasSynced,
+		gatewaysListers:        gatewaysInformer.Lister(),
+		gatewaysSynched:        gatewaysInformer.Informer().HasSynced,
 		workqueue:              workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "IngressIstio"),
 		recorder:               recorder,
 	}
@@ -129,7 +138,7 @@ func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
 	klog.Info("starting controller")
 
 	klog.Info("waiting for informer caches to sync")
-	if ok := cache.WaitForCacheSync(stopCh, c.ingressesSynched, c.ingressClassesSynched, c.servicesSynched, c.virtualServicesSynched); !ok {
+	if ok := cache.WaitForCacheSync(stopCh, c.ingressesSynched, c.ingressClassesSynched, c.servicesSynched, c.virtualServicesSynched, c.gatewaysSynched); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
@@ -205,9 +214,16 @@ func (c *Controller) syncHandler(key string) error {
 	}
 
 	// Handle the VirtualService
-	err = c.handleVirtualService(ingress)
+	vs, err := c.handleVirtualServiceForIngress(ingress)
 	if err != nil {
 		klog.Errorf("failed to handle virtual service: %v", err)
+		return err
+	}
+
+	// Handle the Ingress status
+	_, err = c.handleIngressStatus(ingress, vs)
+	if err != nil {
+		klog.Errorf("failed to handle Ingress status: %v", err)
 		return err
 	}
 

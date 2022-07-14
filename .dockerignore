@@ -9,3 +9,4 @@ deploy/
 Makefile
 .github/
 bin/
+_out/

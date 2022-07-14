@@ -42,13 +42,13 @@ func (c *Controller) findExistingVirtualServiceForIngress(ingress *networkingv1.
 	return nil, nil
 }
 
-func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
+func (c *Controller) handleVirtualServiceForIngress(ingress *networkingv1.Ingress) (*istionetworkingv1beta1.VirtualService, error) {
 	ctx := context.Background()
 
 	// Find an existing virtual service of the same name
 	vs, err := c.findExistingVirtualServiceForIngress(ingress)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Check for conditions which cause us to handle the Ingress
@@ -69,7 +69,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
 		ingressClass, err := c.ingressClassesLister.Get(*ingress.Spec.IngressClassName)
 		if err != nil {
 			klog.Error("error getting IngressClass %q", *ingress.Spec.IngressClassName)
-			return err
+			return nil, err
 		}
 
 		if ingressClass.Spec.Controller == IngressIstioController {
@@ -82,7 +82,7 @@ func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
 	if val, ok := ingress.Annotations[IgnoreAnnotation]; ok {
 		bval, err := strconv.ParseBool(val)
 		if err != nil {
-			return fmt.Errorf("error parsing %s (%t): %v", IgnoreAnnotation, bval, err)
+			return nil, fmt.Errorf("error parsing %s (%t): %v", IgnoreAnnotation, bval, err)
 		}
 		handle = handle && !bval
 	}
@@ -92,11 +92,11 @@ func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
 		if vs != nil {
 			klog.Infof("removing owned virtualservice: \"%s/%s\"", vs.Namespace, vs.Name)
 			err := c.istioclientset.NetworkingV1beta1().VirtualServices(vs.Namespace).Delete(ctx, vs.Name, metav1.DeleteOptions{})
-			return err
+			return nil, err
 		}
 
 		klog.Infof("skipping ingress: \"%s/%s\"", ingress.Namespace, ingress.Name)
-		return nil
+		return nil, nil
 	}
 
 	// Identify the gateway to attach the ingress to
@@ -109,14 +109,14 @@ func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
 
 	nvs, err := c.generateVirtualService(ingress, vs, gateways)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// If we don't have virtual service, then let's make one
 	if vs == nil {
-		_, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Create(ctx, nvs, metav1.CreateOptions{})
+		vs, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Create(ctx, nvs, metav1.CreateOptions{})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else if !reflect.DeepEqual(vs.ObjectMeta.Labels, nvs.ObjectMeta.Labels) || !reflect.DeepEqual(vs.ObjectMeta.Annotations, nvs.ObjectMeta.Annotations) || !reflect.DeepEqual(vs.Spec, nvs.Spec) {
 		klog.Infof("updating virtual service \"%s/%s\"", vs.Namespace, vs.Name)
@@ -128,13 +128,13 @@ func (c *Controller) handleVirtualService(ingress *networkingv1.Ingress) error {
 		uvs.ObjectMeta.Annotations = nvs.ObjectMeta.Annotations
 		uvs.Spec = nvs.Spec
 
-		_, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Update(ctx, uvs, metav1.UpdateOptions{})
+		vs, err = c.istioclientset.NetworkingV1beta1().VirtualServices(ingress.Namespace).Update(ctx, uvs, metav1.UpdateOptions{})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return vs, nil
 }
 
 func generateObjectMetadata(ingress *networkingv1.Ingress, existingVirtualService *istionetworkingv1beta1.VirtualService) (labels map[string]string, annotations map[string]string) {

@@ -4,3 +4,4 @@ ingress-istio-controller
 .vscode
 __debug_bin
 bin/
+_out/
