@@ -168,7 +168,7 @@ func generateObjectMetadata(ingress *networkingv1.Ingress, existingVirtualServic
 	return
 }
 
-func (c *Controller) generateVirtualService(ingress *networkingv1.Ingress, existingVirtualService *istionetworkingv1beta1.VirtualService, gateways []string) (*istionetworkingv1beta1.VirtualService, error) {
+func (c *Controller) generateVirtualService(ingress *networkingv1.Ingress, existingVirtualService *istionetworkingv1beta1.VirtualService, gatewayNames []string) (*istionetworkingv1beta1.VirtualService, error) {
 	labels, annotations := generateObjectMetadata(ingress, existingVirtualService)
 
 	vs := &istionetworkingv1beta1.VirtualService{
@@ -182,11 +182,18 @@ func (c *Controller) generateVirtualService(ingress *networkingv1.Ingress, exist
 			Annotations: annotations,
 		},
 		Spec: v1beta1.VirtualService{
-			Gateways: gateways,
+			Gateways: gatewayNames,
 			Hosts:    []string{},
 			Http:     []*v1beta1.HTTPRoute{},
 		},
 	}
+
+	gateways, err := c.getGatewaysByName(gatewayNames, vs.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	portsOnGateways := c.getNonHTTPPRedirectPortsOnGateways(gateways)
 
 	for _, rule := range ingress.Spec.Rules {
 		if rule.HTTP == nil {
@@ -204,56 +211,99 @@ func (c *Controller) generateVirtualService(ingress *networkingv1.Ingress, exist
 
 		// Add the path
 		for _, path := range rule.HTTP.Paths {
-
-			servicePort, err := c.getServicePort(ingress.Namespace, path.Backend)
+			routes, err := c.createHTTPRoutesForPath(ingress, host, path, portsOnGateways)
 			if err != nil {
 				return nil, err
 			}
 
-			var authorityMatchType v1beta1.StringMatch
-
-			if strings.Contains(host, "*") {
-				authorityMatchType = v1beta1.StringMatch{
-					MatchType: &v1beta1.StringMatch_Regex{
-						// Convert to Regex which is required by Envoy.
-						Regex: strings.ReplaceAll(strings.ReplaceAll(host, ".", "\\."), "*", ".*"),
-					},
-				}
-			} else {
-				authorityMatchType = v1beta1.StringMatch{
-					MatchType: &v1beta1.StringMatch_Exact{
-						Exact: host,
-					},
-				}
-			}
-
-			route := &v1beta1.HTTPRoute{
-				Match: []*v1beta1.HTTPMatchRequest{
-					{
-						Authority: &authorityMatchType,
-					},
-				},
-				Route: []*v1beta1.HTTPRouteDestination{
-					{
-						Destination: &v1beta1.Destination{
-							Host: fmt.Sprintf("%s.%s.svc.%s", path.Backend.Service.Name, ingress.Namespace, c.clusterDomain),
-							Port: &v1beta1.PortSelector{
-								Number: servicePort,
-							},
-						},
-						Weight: int32(c.defaultWeight),
-					},
-				},
-			}
-
-			httpMatch := route.Match[0]
-			httpMatch.Uri = createStringMatch(path)
-
-			vs.Spec.Http = append(vs.Spec.Http, route)
+			vs.Spec.Http = append(vs.Spec.Http, routes...)
 		}
 	}
 
 	return vs, nil
+}
+
+// Returns the ports on the Gateway for Servers not running HTTPRedirect
+func (c *Controller) getNonHTTPPRedirectPortsOnGateways(gateways []*istionetworkingv1beta1.Gateway) []uint32 {
+	var ports []uint32
+
+	for _, gateway := range gateways {
+		for _, server := range gateway.Spec.Servers {
+			if !server.Tls.HttpsRedirect {
+				ports = append(ports, server.Port.Number)
+			}
+		}
+	}
+
+	return ports
+}
+
+func (c *Controller) createHTTPRoutesForPath(ingress *networkingv1.Ingress, host string, path networkingv1.HTTPIngressPath, portsOnGateways []uint32) ([]*v1beta1.HTTPRoute, error) {
+	servicePort, err := c.getServicePort(ingress.Namespace, path.Backend)
+	if err != nil {
+		return nil, err
+	}
+
+	var authorityMatches []v1beta1.StringMatch
+
+	if strings.Contains(host, "*") {
+		authorityMatches = append(authorityMatches, v1beta1.StringMatch{
+			MatchType: &v1beta1.StringMatch_Regex{
+				// Convert to Regex which is required by Envoy.
+				Regex: strings.ReplaceAll(strings.ReplaceAll(host, ".", "\\."), "*", ".*"),
+			},
+		})
+	} else {
+		authorityMatches = c.createAuthorityMatches(host, portsOnGateways)
+	}
+
+	var routes []*v1beta1.HTTPRoute
+
+	for _, authMatch := range authorityMatches {
+		routes = append(routes, &v1beta1.HTTPRoute{
+			Match: []*v1beta1.HTTPMatchRequest{
+				{
+					Authority: &authMatch,
+					Uri:       createStringMatch(path),
+				},
+			},
+			Route: []*v1beta1.HTTPRouteDestination{
+				{
+					Destination: &v1beta1.Destination{
+						Host: fmt.Sprintf("%s.%s.svc.%s", path.Backend.Service.Name, ingress.Namespace, c.clusterDomain),
+						Port: &v1beta1.PortSelector{
+							Number: servicePort,
+						},
+					},
+					Weight: int32(c.defaultWeight),
+				},
+			},
+		})
+	}
+
+	return routes, nil
+}
+
+// Creates all of the possible authority matches for a given host and the ports on which it is advertised.
+// This is to fix issues where the HOST header may include the port information.
+func (c *Controller) createAuthorityMatches(host string, ports []uint32) []v1beta1.StringMatch {
+	authorityMatches := make([]v1beta1.StringMatch, len(ports)+1)
+
+	authorityMatches = append(authorityMatches, v1beta1.StringMatch{
+		MatchType: &v1beta1.StringMatch_Exact{
+			Exact: host,
+		},
+	})
+
+	for _, port := range ports {
+		authorityMatches = append(authorityMatches, v1beta1.StringMatch{
+			MatchType: &v1beta1.StringMatch_Exact{
+				Exact: fmt.Sprintf("%s:%d", host, port),
+			},
+		})
+	}
+
+	return authorityMatches
 }
 
 func (c *Controller) getServicePort(namespace string, backend networkingv1.IngressBackend) (uint32, error) {
