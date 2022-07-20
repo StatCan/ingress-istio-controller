@@ -211,7 +211,7 @@ func (c *Controller) generateVirtualService(ingress *networkingv1.Ingress, exist
 
 		// Add the path
 		for _, path := range rule.HTTP.Paths {
-			routes, err := c.createHttpRoutesForPath(ingress, host, path, portsOnGateways)
+			routes, err := c.createHTTPRoutesForPath(ingress, host, path, portsOnGateways)
 			if err != nil {
 				return nil, err
 			}
@@ -238,7 +238,7 @@ func (c *Controller) getNonHTTPPRedirectPortsOnGateways(gateways []*istionetwork
 	return ports
 }
 
-func (c *Controller) createHttpRoutesForPath(ingress *networkingv1.Ingress, host string, path networkingv1.HTTPIngressPath, portsOnGateways []uint32) ([]*v1beta1.HTTPRoute, error) {
+func (c *Controller) createHTTPRoutesForPath(ingress *networkingv1.Ingress, host string, path networkingv1.HTTPIngressPath, portsOnGateways []uint32) ([]*v1beta1.HTTPRoute, error) {
 	servicePort, err := c.getServicePort(ingress.Namespace, path.Backend)
 	if err != nil {
 		return nil, err
