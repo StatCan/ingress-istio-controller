@@ -244,10 +244,10 @@ func (c *Controller) createHTTPRoutesForPath(ingress *networkingv1.Ingress, host
 		return nil, err
 	}
 
-	var authorityMatches []v1beta1.StringMatch
+	var authorityMatches []*v1beta1.StringMatch
 
 	if strings.Contains(host, "*") {
-		authorityMatches = append(authorityMatches, v1beta1.StringMatch{
+		authorityMatches = append(authorityMatches, &v1beta1.StringMatch{
 			MatchType: &v1beta1.StringMatch_Regex{
 				// Convert to Regex which is required by Envoy.
 				Regex: strings.ReplaceAll(strings.ReplaceAll(host, ".", "\\."), "*", ".*"),
@@ -257,13 +257,13 @@ func (c *Controller) createHTTPRoutesForPath(ingress *networkingv1.Ingress, host
 		authorityMatches = c.createAuthorityMatches(host, portsOnGateways)
 	}
 
-	var routes []*v1beta1.HTTPRoute
+	routes := make([]*v1beta1.HTTPRoute, len(authorityMatches))
 
-	for _, authMatch := range authorityMatches {
-		routes = append(routes, &v1beta1.HTTPRoute{
+	for i, authMatch := range authorityMatches {
+		routes[i] = &v1beta1.HTTPRoute{
 			Match: []*v1beta1.HTTPMatchRequest{
 				{
-					Authority: &authMatch,
+					Authority: authMatch,
 					Uri:       createStringMatch(path),
 				},
 			},
@@ -278,7 +278,7 @@ func (c *Controller) createHTTPRoutesForPath(ingress *networkingv1.Ingress, host
 					Weight: int32(c.defaultWeight),
 				},
 			},
-		})
+		}
 	}
 
 	return routes, nil
@@ -286,21 +286,21 @@ func (c *Controller) createHTTPRoutesForPath(ingress *networkingv1.Ingress, host
 
 // Creates all of the possible authority matches for a given host and the ports on which it is advertised.
 // This is to fix issues where the HOST header may include the port information.
-func (c *Controller) createAuthorityMatches(host string, ports []uint32) []v1beta1.StringMatch {
-	authorityMatches := make([]v1beta1.StringMatch, len(ports)+1)
+func (c *Controller) createAuthorityMatches(host string, ports []uint32) []*v1beta1.StringMatch {
+	authorityMatches := make([]*v1beta1.StringMatch, (len(ports) + 1))
 
-	authorityMatches = append(authorityMatches, v1beta1.StringMatch{
+	authorityMatches[0] = &v1beta1.StringMatch{
 		MatchType: &v1beta1.StringMatch_Exact{
 			Exact: host,
 		},
-	})
+	}
 
-	for _, port := range ports {
-		authorityMatches = append(authorityMatches, v1beta1.StringMatch{
+	for i, port := range ports {
+		authorityMatches[i+1] = &v1beta1.StringMatch{
 			MatchType: &v1beta1.StringMatch_Exact{
 				Exact: fmt.Sprintf("%s:%d", host, port),
 			},
-		})
+		}
 	}
 
 	return authorityMatches
