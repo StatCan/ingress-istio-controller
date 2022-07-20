@@ -56,9 +56,15 @@ func (c *Controller) handleIngressStatus(ingress *networkingv1.Ingress, vs *isti
 
 // getGatewaysForVirtualService will get the gateways associated with the Virtual Service.
 func (c *Controller) getGatewaysForVirtualService(vs *istionetworkingv1beta1.VirtualService) ([]*istionetworkingv1beta1.Gateway, error) {
+	return c.getGatewaysByName(vs.Spec.Gateways, vs.Namespace)
+}
+
+// Return the Gateways based on their names. The names are in the form of "namespace/name".
+// If there is no namespace prepended, the current namespace is used as the originating source.
+func (c *Controller) getGatewaysByName(gatewayNames []string, currentNamespace string) ([]*istionetworkingv1beta1.Gateway, error) {
 	gateways := []*istionetworkingv1beta1.Gateway{}
 
-	for _, gatewayId := range vs.Spec.Gateways {
+	for _, gatewayId := range gatewayNames {
 		var gateway *istionetworkingv1beta1.Gateway
 		var err error
 
@@ -67,7 +73,7 @@ func (c *Controller) getGatewaysForVirtualService(vs *istionetworkingv1beta1.Vir
 
 		switch len(idParts) {
 		case 1:
-			gateway, err = c.gatewaysListers.Gateways(vs.Namespace).Get(idParts[0])
+			gateway, err = c.gatewaysListers.Gateways(currentNamespace).Get(idParts[0])
 		case 2:
 			gateway, err = c.gatewaysListers.Gateways(idParts[0]).Get(idParts[1])
 		default:
