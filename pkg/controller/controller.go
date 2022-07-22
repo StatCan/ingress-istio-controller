@@ -220,11 +220,13 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
-	// Handle the Ingress status
-	_, err = c.handleIngressStatus(ingress, vs)
-	if err != nil {
-		klog.Errorf("failed to handle Ingress status: %v", err)
-		return err
+	// If the Ingress was handled, update its status.
+	if vs != nil {
+		_, err = c.handleIngressStatus(ingress, vs)
+		if err != nil {
+			klog.Errorf("failed to handle Ingress status: %v", err)
+			return err
+		}
 	}
 
 	return nil
