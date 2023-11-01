@@ -3,6 +3,7 @@ module github.com/StatCan/ingress-istio-controller
 go 1.18
 
 require (
+	github.com/google/uuid v1.1.2
 	istio.io/api v0.0.0-20211015181651-ddbde26ea264
 	istio.io/client-go v1.10.6
 	k8s.io/api v0.20.2

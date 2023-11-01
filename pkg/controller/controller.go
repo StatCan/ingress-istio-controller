@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -131,24 +132,24 @@ func NewController(
 }
 
 // Run runs the controller.
-func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
+func (c *Controller) Run(threadiness int, ctx context.Context) error {
 	defer utilruntime.HandleCrash()
 	defer c.workqueue.ShutDown()
 
 	klog.Info("starting controller")
 
 	klog.Info("waiting for informer caches to sync")
-	if ok := cache.WaitForCacheSync(stopCh, c.ingressesSynched, c.ingressClassesSynched, c.servicesSynched, c.virtualServicesSynched, c.gatewaysSynched); !ok {
+	if ok := cache.WaitForCacheSync(ctx.Done(), c.ingressesSynched, c.ingressClassesSynched, c.servicesSynched, c.virtualServicesSynched, c.gatewaysSynched); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
 	klog.Info("starting workers")
 	for i := 0; i < threadiness; i++ {
-		go wait.Until(c.runWorker, time.Second, stopCh)
+		go wait.Until(c.runWorker, time.Second, ctx.Done())
 	}
 
 	klog.Info("started workers")
-	<-stopCh
+	<-ctx.Done()
 	klog.Info("shutting down workers")
 
 	return nil
