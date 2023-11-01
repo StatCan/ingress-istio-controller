@@ -130,7 +130,7 @@ func runWithLeaderElection(ctlr *controller.Controller, cfg *rest.Config, kubecl
 				klog.Info("stopped leading")
 			},
 			OnNewLeader: func(identity string) {
-				if identity == id {
+				if identity == lockIdentity {
 					// We just acquired the lock
 					return
 				}
