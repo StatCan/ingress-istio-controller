@@ -35,6 +35,7 @@ var (
 	defaultWeight  int
 	lockName       string
 	lockNamespace  string
+	lockIdentity   string
 )
 
 func main() {
@@ -94,13 +95,7 @@ func runWithLeaderElection(ctlr *controller.Controller, cfg *rest.Config, kubecl
 
 	// Acquire a lock
 	// Identity used to distinguish between multiple cloud controller manager instances
-	id, err := os.Hostname()
-	if err != nil {
-		klog.Fatal(err)
-	}
-	// add a uniquifier so that two processes on the same host don't accidentally both become active
-	id = id + "_" + string(uuid.NewUUID())
-	klog.Infof("generated id: %s", id)
+	klog.Infof("leader identity id: %s", lockIdentity)
 
 	var lock resourcelock.Interface
 
@@ -111,7 +106,7 @@ func runWithLeaderElection(ctlr *controller.Controller, cfg *rest.Config, kubecl
 		},
 		Client: kubeclient.CoordinationV1(),
 		LockConfig: resourcelock.ResourceLockConfig{
-			Identity: id,
+			Identity: lockIdentity,
 		},
 	}
 
@@ -146,16 +141,6 @@ func runWithLeaderElection(ctlr *controller.Controller, cfg *rest.Config, kubecl
 	})
 }
 
-// Returns an environment variables value if set, otherwise returns dflt.
-func getEnvVarOrDefault(envVar, dflt string) string {
-	val, ok := os.LookupEnv(envVar)
-	if ok {
-		return val
-	} else {
-		return dflt
-	}
-}
-
 func init() {
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
@@ -166,4 +151,25 @@ func init() {
 	flag.IntVar(&defaultWeight, "virtual-service-weight", 100, "The weight of the Virtual Service destination.")
 	flag.StringVar(&lockName, "lock-name", getEnvVarOrDefault("LOCK_NAME", "sidecar-terminator"), "The name of the leader lock.")
 	flag.StringVar(&lockNamespace, "lock-namespace", getEnvVarOrDefault("LOCK_NAMESPACE", "sidecar-terminator-system"), "The namespace where the leader lock resides.")
+	flag.StringVar(&lockIdentity, "lock-identity", getEnvVarOrDefault("LOCK_IDENTITY", createIdentity()), "The unique identity of the replica. (Pod name is best)")
+}
+
+// Returns an environment variables value if set, otherwise returns dflt.
+func getEnvVarOrDefault(envVar, dflt string) string {
+	val, ok := os.LookupEnv(envVar)
+	if ok {
+		return val
+	} else {
+		return dflt
+	}
+}
+
+// Creates a unique identity.
+func createIdentity() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		klog.Fatal(err)
+	}
+	// add a uniquifier so that two processes on the same host don't accidentally both become active
+	return hostname + "_" + string(uuid.NewUUID())
 }
