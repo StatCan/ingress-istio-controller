@@ -147,7 +147,7 @@ func runWithLeaderElection(ctlr *controller.Controller, cfg *rest.Config, kubecl
 }
 
 // Returns an environment variables value if set, otherwise returns dflt.
-func getEnvOrDefault(dflt, envVar string) string {
+func getEnvVarOrDefault(envVar, dflt string) string {
 	val, ok := os.LookupEnv(envVar)
 	if ok {
 		return val
@@ -164,6 +164,6 @@ func init() {
 	flag.BoolVar(&scopedGateways, "scoped-gateways", false, "Gateways are scoped to the same namespace they exist within. This will limit the Service search for Load Balancer status. In istiod, this is controlled via the PILOT_SCOPE_GATEWAY_TO_NAMESPACE environment variable.")
 	flag.StringVar(&ingressClass, "ingress-class", "", "The ingress class annotation to monitor (empty string to skip checking annotation)")
 	flag.IntVar(&defaultWeight, "virtual-service-weight", 100, "The weight of the Virtual Service destination.")
-	flag.StringVar(&lockName, "lock-name", getEnvOrDefault("sidecar-terminator", "LOCK_NAME"), "The name of the leader lock.")
-	flag.StringVar(&lockNamespace, "lock-namespace", getEnvOrDefault("sidecar-terminator-system", "LOCK_NAMESPACE"), "The namespace where the leader lock resides.")
+	flag.StringVar(&lockName, "lock-name", getEnvVarOrDefault("LOCK_NAME", "sidecar-terminator"), "The name of the leader lock.")
+	flag.StringVar(&lockNamespace, "lock-namespace", getEnvVarOrDefault("LOCK_NAMESPACE", "sidecar-terminator-system"), "The namespace where the leader lock resides.")
 }
