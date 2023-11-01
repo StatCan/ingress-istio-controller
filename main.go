@@ -149,8 +149,8 @@ func init() {
 	flag.BoolVar(&scopedGateways, "scoped-gateways", false, "Gateways are scoped to the same namespace they exist within. This will limit the Service search for Load Balancer status. In istiod, this is controlled via the PILOT_SCOPE_GATEWAY_TO_NAMESPACE environment variable.")
 	flag.StringVar(&ingressClass, "ingress-class", "", "The ingress class annotation to monitor (empty string to skip checking annotation)")
 	flag.IntVar(&defaultWeight, "virtual-service-weight", 100, "The weight of the Virtual Service destination.")
-	flag.StringVar(&lockName, "lock-name", getEnvVarOrDefault("LOCK_NAME", "sidecar-terminator"), "The name of the leader lock.")
-	flag.StringVar(&lockNamespace, "lock-namespace", getEnvVarOrDefault("LOCK_NAMESPACE", "sidecar-terminator-system"), "The namespace where the leader lock resides.")
+	flag.StringVar(&lockName, "lock-name", getEnvVarOrDefault("LOCK_NAME", "ingress-istio-controller"), "The name of the leader lock.")
+	flag.StringVar(&lockNamespace, "lock-namespace", getEnvVarOrDefault("LOCK_NAMESPACE", "ingress-istio-controller-system"), "The namespace where the leader lock resides.")
 	flag.StringVar(&lockIdentity, "lock-identity", getEnvVarOrDefault("LOCK_IDENTITY", createIdentity()), "The unique identity of the replica. (Pod name is best)")
 }
 
