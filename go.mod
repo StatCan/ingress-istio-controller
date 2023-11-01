@@ -3,7 +3,6 @@ module github.com/StatCan/ingress-istio-controller
 go 1.18
 
 require (
-	github.com/google/uuid v1.1.2
 	istio.io/api v0.0.0-20211015181651-ddbde26ea264
 	istio.io/client-go v1.10.6
 	k8s.io/api v0.20.2
@@ -28,6 +27,7 @@ require (
 	github.com/golang/protobuf v1.4.3 // indirect
 	github.com/google/go-cmp v0.5.2 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
+	github.com/google/uuid v1.1.2 // indirect
 	github.com/googleapis/gnostic v0.4.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/imdario/mergo v0.3.5 // indirect
