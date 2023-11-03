@@ -1,17 +1,27 @@
 package main
 
 import (
+	"context"
 	"flag"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/StatCan/ingress-istio-controller/pkg/controller"
-	"github.com/StatCan/ingress-istio-controller/pkg/signals"
 	istio "istio.io/client-go/pkg/clientset/versioned"
 	istioinformers "istio.io/client-go/pkg/informers/externalversions"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/client-go/transport"
 	"k8s.io/klog"
 )
 
@@ -23,13 +33,14 @@ var (
 	scopedGateways bool
 	ingressClass   string
 	defaultWeight  int
+	lockName       string
+	lockNamespace  string
+	lockIdentity   string
 )
 
 func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
-
-	stopCh := signals.SetupSignalHandler()
 
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
@@ -63,12 +74,71 @@ func main() {
 		istioInformerFactory.Networking().V1beta1().VirtualServices(),
 		istioInformerFactory.Networking().V1beta1().Gateways())
 
-	kubeInformerFactory.Start(stopCh)
-	istioInformerFactory.Start(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	if err = ctlr.Run(2, stopCh); err != nil {
-		klog.Fatalf("error running controller: %v", err)
+	wait := make(chan os.Signal, 1)
+	signal.Notify(wait, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-wait
+		klog.Info("received signal, shutting down")
+		cancel()
+	}()
+
+	kubeInformerFactory.Start(ctx.Done())
+	istioInformerFactory.Start(ctx.Done())
+
+	runWithLeaderElection(ctlr, cfg, kubeclient, ctx)
+}
+
+func runWithLeaderElection(ctlr *controller.Controller, cfg *rest.Config, kubeclient *kubernetes.Clientset, ctx context.Context) {
+
+	// Acquire a lock
+	// Identity used to distinguish between multiple cloud controller manager instances
+	klog.Infof("leader identity id: %s", lockIdentity)
+
+	var lock resourcelock.Interface
+
+	lock = &resourcelock.LeaseLock{
+		LeaseMeta: metav1.ObjectMeta{
+			Name:      lockName,
+			Namespace: lockNamespace,
+		},
+		Client: kubeclient.CoordinationV1(),
+		LockConfig: resourcelock.ResourceLockConfig{
+			Identity: lockIdentity,
+		},
 	}
+
+	cfg.Wrap(transport.ContextCanceller(ctx, fmt.Errorf("the leader is shutting down")))
+
+	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
+		Lock:            lock,
+		ReleaseOnCancel: true,
+		LeaseDuration:   15 * time.Second,
+		RenewDeadline:   10 * time.Second,
+		RetryPeriod:     2 * time.Second,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: func(ctx context.Context) {
+				if err := ctlr.Run(2, ctx); err != nil {
+					if err != context.Canceled {
+						klog.Errorf("error running controller: %v", err)
+					}
+				}
+			},
+			OnStoppedLeading: func() {
+				klog.Info("stopped leading")
+			},
+			OnNewLeader: func(identity string) {
+				if identity == lockIdentity {
+					// We just acquired the lock
+					return
+				}
+
+				klog.Infof("new leader elected: %v", identity)
+			},
+		},
+	})
 }
 
 func init() {
@@ -79,4 +149,27 @@ func init() {
 	flag.BoolVar(&scopedGateways, "scoped-gateways", false, "Gateways are scoped to the same namespace they exist within. This will limit the Service search for Load Balancer status. In istiod, this is controlled via the PILOT_SCOPE_GATEWAY_TO_NAMESPACE environment variable.")
 	flag.StringVar(&ingressClass, "ingress-class", "", "The ingress class annotation to monitor (empty string to skip checking annotation)")
 	flag.IntVar(&defaultWeight, "virtual-service-weight", 100, "The weight of the Virtual Service destination.")
+	flag.StringVar(&lockName, "lock-name", getEnvVarOrDefault("LOCK_NAME", "ingress-istio-controller"), "The name of the leader lock.")
+	flag.StringVar(&lockNamespace, "lock-namespace", getEnvVarOrDefault("LOCK_NAMESPACE", "ingress-istio-controller-system"), "The namespace where the leader lock resides.")
+	flag.StringVar(&lockIdentity, "lock-identity", getEnvVarOrDefault("LOCK_IDENTITY", createIdentity()), "The unique identity of the replica. (Pod name is best)")
+}
+
+// Returns an environment variables value if set, otherwise returns dflt.
+func getEnvVarOrDefault(envVar, dflt string) string {
+	val, ok := os.LookupEnv(envVar)
+	if ok {
+		return val
+	} else {
+		return dflt
+	}
+}
+
+// Creates a unique identity.
+func createIdentity() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		klog.Fatal(err)
+	}
+	// add a uniquifier so that two processes on the same host don't accidentally both become active
+	return hostname + "_" + string(uuid.NewUUID())
 }
